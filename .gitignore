@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# backend runtime
+backend/venv/
+backend/data/
+__pycache__/
+*.pyc
+.venv/
+
+# env & secrets
+.env
+.env*.local
+
+# databases & caches
+db/*.db
+*.pkl
+*.sqlite3
+
+# logs & misc
+*.log
+dev.log
+server.log
+.DS_Store
+coverage/
+.vercel

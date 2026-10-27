@@ -1,0 +1,214 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/*
+ * ── AstroTrader pastel Vedic palette ──────────────────────────────
+ * Warm ivory canvas, deep walnut ink, and a rich set of festival
+ * pastels: marigold saffron, lotus rose, peacock teal, temple
+ * lavender, and old-gold highlights.
+ */
+:root {
+  --radius: 0.75rem;
+
+  --background: #f8f0df;
+  --foreground: #4a3525;
+
+  --card: #fffdf6;
+  --card-foreground: #4a3525;
+
+  --popover: #fffdf6;
+  --popover-foreground: #4a3525;
+
+  --primary: #d98324;
+  --primary-foreground: #fffaf0;
+
+  --secondary: #f7e8cd;
+  --secondary-foreground: #7c5a2e;
+
+  --muted: #f4ead4;
+  --muted-foreground: #97795a;
+
+  --accent: #f9e0dc;
+  --accent-foreground: #a14d5c;
+
+  --destructive: #cf5b54;
+
+  --border: #ecdec2;
+  --input: #ecdec2;
+  --ring: #d98324;
+
+  --chart-1: #e8a04c;
+  --chart-2: #5bbfa0;
+  --chart-3: #e8788a;
+  --chart-4: #9b8ac4;
+  --chart-5: #45a79a;
+
+  --sidebar: #fffdf6;
+  --sidebar-foreground: #4a3525;
+  --sidebar-primary: #d98324;
+  --sidebar-primary-foreground: #fffaf0;
+  --sidebar-accent: #f7e8cd;
+  --sidebar-accent-foreground: #7c5a2e;
+  --sidebar-border: #ecdec2;
+  --sidebar-ring: #d98324;
+
+  /* Vedic accents */
+  --marigold: #e8912d;
+  --gold: #c9962e;
+  --gold-deep: #9c6b16;
+  --rose: #e8788a;
+  --teal: #45a79a;
+  --lavender: #9b8ac4;
+  --terra: #c96f4a;
+  --ink-soft: #8a6f52;
+  --line-warm: #e2cfa6;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ── Typography helpers ─────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display), "Georgia", serif;
+}
+.font-brand {
+  font-family: var(--font-brand), var(--font-display), serif;
+}
+
+/* Old-gold gradient headline text */
+.gold-text {
+  background: linear-gradient(115deg, #a8701a 0%, #d99a3a 38%, #8f6212 72%, #c78f2e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Vedic backdrop: soft auroras + faint mandala watermark ─────── */
+.vedic-backdrop {
+  background-color: #f8f0df;
+  background-image:
+    radial-gradient(ellipse 70% 45% at 15% -5%, rgba(232, 144, 45, 0.14), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 88% 8%, rgba(232, 120, 138, 0.10), transparent 60%),
+    radial-gradient(ellipse 60% 45% at 50% 115%, rgba(69, 167, 154, 0.10), transparent 62%),
+    radial-gradient(ellipse 45% 35% at 4% 72%, rgba(155, 138, 196, 0.09), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%23b98a3c' stroke-opacity='0.055'%3E%3Ccircle cx='130' cy='130' r='104'/%3E%3Ccircle cx='130' cy='130' r='78'/%3E%3Ccircle cx='130' cy='130' r='52'/%3E%3Ccircle cx='130' cy='130' r='26'/%3E%3Cg%3E%3Cellipse cx='130' cy='52' rx='20' ry='46'/%3E%3Cellipse cx='130' cy='208' rx='20' ry='46'/%3E%3Cellipse cx='52' cy='130' rx='46' ry='20'/%3E%3Cellipse cx='208' cy='130' rx='46' ry='20'/%3E%3C/g%3E%3Cg transform='rotate(45 130 130)'%3E%3Cellipse cx='130' cy='52' rx='20' ry='46'/%3E%3Cellipse cx='130' cy='208' rx='20' ry='46'/%3E%3Cellipse cx='52' cy='130' rx='46' ry='20'/%3E%3Cellipse cx='208' cy='130' rx='46' ry='20'/%3E%3C/g%3E%3Cg transform='rotate(22.5 130 130)'%3E%3Cellipse cx='130' cy='52' rx='13' ry='40'/%3E%3Cellipse cx='130' cy='208' rx='13' ry='40'/%3E%3Cellipse cx='52' cy='130' rx='40' ry='13'/%3E%3Cellipse cx='208' cy='130' rx='40' ry='13'/%3E%3C/g%3E%3Cg transform='rotate(67.5 130 130)'%3E%3Cellipse cx='130' cy='52' rx='13' ry='40'/%3E%3Cellipse cx='130' cy='208' rx='13' ry='40'/%3E%3Cellipse cx='52' cy='130' rx='40' ry='13'/%3E%3Cellipse cx='208' cy='130' rx='40' ry='13'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ── Warm card treatment ────────────────────────────────────────── */
+.vedic-card {
+  background: linear-gradient(160deg, rgba(255, 253, 246, 0.96), rgba(253, 246, 231, 0.94));
+  border: 1px solid #ecdec2;
+  box-shadow:
+    0 1px 2px rgba(140, 104, 50, 0.05),
+    0 10px 30px -18px rgba(140, 104, 50, 0.28);
+  backdrop-filter: blur(6px);
+}
+
+/* Ornamental gold hairline for header/footer edges */
+.ornament-rule {
+  height: 3px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 10px,
+      #d9b46a 10px 14px,
+      #e8ca8b 14px 16px,
+      transparent 16px 26px
+    );
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+
+/* Scalloped temple-arch strip (used under the header) */
+.temple-arch {
+  height: 10px;
+  background-image: radial-gradient(circle at 10px -4px, transparent 12px, #f2e3c2 12.5px, #f2e3c2 14px, transparent 14.5px);
+  background-size: 20px 10px;
+  background-repeat: repeat-x;
+}
+
+/* ── Warm scrollbars ────────────────────────────────────────────── */
+.warm-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #dcc08a transparent;
+}
+.warm-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.warm-scroll::-webkit-scrollbar-thumb {
+  background: #ddc290;
+  border-radius: 8px;
+}
+.warm-scroll::-webkit-scrollbar-thumb:hover {
+  background: #cfa96a;
+}
+.warm-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Kundali (North Indian chart) shared styles ─────────────────── */
+.kundali-line {
+  stroke: #8a6f52;
+  stroke-width: 1.4;
+  fill: none;
+  stroke-linecap: round;
+}
+.kundali-sign-num {
+  font-family: var(--font-display), serif;
+  fill: #b0763a;
+  font-weight: 600;
+}
+.kundali-degree {
+  fill: #8a6f52;
+  font-family: var(--font-geist-mono), monospace;
+}
+
+/* nudge 1787951300 */

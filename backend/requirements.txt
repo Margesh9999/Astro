@@ -1,0 +1,15 @@
+fastapi>=0.141
+uvicorn[standard]>=0.52
+pydantic>=2.13
+pyswisseph==2.10.3.2
+pandas>=3.0
+numpy>=2.5
+scikit-learn>=1.9
+scipy>=1.18
+yfinance>=1.7
+curl_cffi>=0.16
+requests>=2.34
+python-dateutil>=2.9
+httpx>=0.28
+python-dotenv>=1.2
+beautifulsoup4>=4.15
