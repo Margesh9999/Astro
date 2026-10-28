@@ -1,7 +1,7 @@
 import app.core.ssl_fix  # noqa: F401  repairs certifi bundle BEFORE yfinance/curl_cffi load
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes
+from app.api import routes, routes_quant, routes_models, routes_cycles, routes_jataka, routes_strategy
 from app.core.config import settings
 
 app = FastAPI(
@@ -21,6 +21,9 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(routes.router, prefix="/api/v1")
+# v1.3 feature routers — one per area so they evolve independently
+for _r in (routes_quant, routes_models, routes_cycles, routes_jataka, routes_strategy):
+    app.include_router(_r.router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

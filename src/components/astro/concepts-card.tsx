@@ -73,8 +73,9 @@ export function ConceptsCard() {
           )}
         </div>
         <CardDescription className="text-[#97795a]">
-          Every concept from the 28 audited repositories — mapped to where it lives in AstroTrader, with its
-          trading meaning. Nothing silently dropped: implemented, partial, or documented as reference-only.
+          Every rule, model, strategy and chart from the {summary ? summary.repos : ''} audited repositories — mapped to the exact
+          card and tab where it lives, with its trading meaning. Honest status: implemented, partial (what is missing is
+          stated), or reference-only.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

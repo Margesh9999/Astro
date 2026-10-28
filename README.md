@@ -11,10 +11,12 @@ astrotrader/
 ├── src/                  # ⚡ Next.js 16 dashboard (pastel Vedic UI, North Indian kundali SVGs)
 │   ├── app/              # pages + /api/astro same-origin proxy route
 │   └── components/astro/ # dashboard cards + north-indian-chart.tsx renderer
-├── backend/              # 🐍 FastAPI service (Swiss Ephemeris + yfinance + sklearn)
+├── mini-services/astro-backend/  # 🐍 LIVE FastAPI service (Swiss Ephemeris + yfinance + ML)
 │   ├── app/core/         # ssl_fix self-healing TLS, vedic math, ephemeris
-│   ├── app/services/     # market_data (cache + Stooq fallback), predictor
-│   └── app/api/routes.py # 9 REST endpoints under /api/v1
+│   ├── app/services/     # market data, quant, model zoo, cycles, jataka, agents, final strategy
+│   ├── app/api/          # routes.py + routes_<area>.py, all under /api/v1
+│   └── tests/            # pytest suites (52 tests)
+├── backend/              # legacy v1.0 copy of the service (not used at runtime)
 ├── scripts/              # 🧪 regression suites (gateway 11-check, public 8-check)
 ├── docs/                 # this document
 └── prisma/               # scaffold datastore (domain itself is stateless)
@@ -23,14 +25,16 @@ astrotrader/
 **Run it locally** 🚀
 
 ```bash
-# 1. Backend (Python 3.12+)
-cd backend
+# 1. Backend (Python 3.12+) — Next.js auto-starts it from this venv
+cd mini-services/astro-backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000        # API docs at :8000/docs
+# offline / CI: ASTRO_DEMO_DATA=1 uvicorn app.main:app --port 8000   (synthetic prices)
+python -m pytest -q tests                # 52 tests
 
 # 2. Frontend (Node 20+)
-cd ..
+cd ../..
 npm install
 npm run dev                              # dashboard at :3000
 

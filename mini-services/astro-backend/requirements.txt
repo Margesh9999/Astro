@@ -1,6 +1,7 @@
 fastapi>=0.141
 uvicorn[standard]>=0.52
 pydantic>=2.13
+pydantic-settings>=2.6
 pyswisseph==2.10.3.2
 pandas>=3.0
 numpy>=2.5
@@ -13,3 +14,9 @@ python-dateutil>=2.9
 httpx>=0.28
 python-dotenv>=1.2
 beautifulsoup4>=4.15
+statsmodels>=0.14
+# v1.3 Model Lab (all optional at runtime: missing ones show as "skipped")
+xgboost-cpu>=3.0
+lightgbm>=4.5
+catboost>=1.2
+joblib>=1.4

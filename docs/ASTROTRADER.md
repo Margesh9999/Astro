@@ -11,10 +11,12 @@ astrotrader/
 ├── src/                  # ⚡ Next.js 16 dashboard (pastel Vedic UI, North Indian kundali SVGs)
 │   ├── app/              # pages + /api/astro same-origin proxy route
 │   └── components/astro/ # dashboard cards + north-indian-chart.tsx renderer
-├── backend/              # 🐍 FastAPI service (Swiss Ephemeris + yfinance + sklearn)
+├── mini-services/astro-backend/  # 🐍 LIVE FastAPI service (Swiss Ephemeris + yfinance + ML)
 │   ├── app/core/         # ssl_fix self-healing TLS, vedic math, ephemeris
-│   ├── app/services/     # market_data (cache + Stooq fallback), predictor
-│   └── app/api/routes.py # 9 REST endpoints under /api/v1
+│   ├── app/services/     # market data, quant, model zoo, cycles, jataka, agents, final strategy
+│   ├── app/api/          # routes.py + routes_<area>.py, all under /api/v1
+│   └── tests/            # pytest suites (52 tests)
+├── backend/              # legacy v1.0 copy of the service (not used at runtime)
 ├── scripts/              # 🧪 regression suites (gateway 11-check, public 8-check)
 ├── docs/                 # this document
 └── prisma/               # scaffold datastore (domain itself is stateless)
@@ -23,14 +25,16 @@ astrotrader/
 **Run it locally** 🚀
 
 ```bash
-# 1. Backend (Python 3.12+)
-cd backend
+# 1. Backend (Python 3.12+) — Next.js auto-starts it from this venv
+cd mini-services/astro-backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000        # API docs at :8000/docs
+# offline / CI: ASTRO_DEMO_DATA=1 uvicorn app.main:app --port 8000   (synthetic prices)
+python -m pytest -q tests                # 52 tests
 
 # 2. Frontend (Node 20+)
-cd ..
+cd ../..
 npm install
 npm run dev                              # dashboard at :3000
 
@@ -68,8 +72,9 @@ bash scripts/test_gateway.sh             # expect 11/11 PASS ✅
 - [🪑 22. Suri Astro-Signal Engine](#section-22-suri-engine)
 - [🏛️ 23. Institutional Quant Desk and Options Lab](#section-23-quant-desk)
 - [✨ 24. Jataka Wealth Blueprint, Model Zoo & Coverage Suite — v1.2](#section-24-v12-suite)
-- [💬 25. Ready-to-Post ADO Comment](#section-22-ado-comment)
-- [🧾 26. Document Governance](#section-23-governance)
+- [🌈 25. Explain-Everything Upgrade — v1.3](#section-25-v13-suite)
+- [💬 26. Ready-to-Post ADO Comment](#section-22-ado-comment)
+- [🧾 27. Document Governance](#section-23-governance)
 
 ---
 
@@ -837,6 +842,8 @@ Version 1.2 turns AstroTrader from an analysis dashboard into a **personal wealt
 
 ### 24.2 The Antardasha rectification (T12⑥)
 
+> ⚠️ Superseded by §25.2 — v1.2 still compressed the birth mahadasha's antardashas; v1.3 fixes it.
+
 The dasha engine was rewritten to the drikpanchang-standard Vimshottari and ships with invariant tests:
 
 1. The mahadasha sequence starts from the lord of the Moon's birth nakshatra; the first MD runs only for its **balance** (`years × (1 − elapsed fraction)`).
@@ -886,24 +893,100 @@ The zoo trains 13 model families with `TimeSeriesSplit` walk-forward validation 
 
 ---
 
-<a id="section-22-ado-comment"></a>
-## 💬 25. Ready-to-Post ADO Comment
+<a id="section-25-v13-suite"></a>
+## 🌈 25. Explain-Everything Upgrade — v1.3
 
-> 🙏✨ Hi team! AstroTrader v1.2 is live — the dashboard is now a **personal wealth-planning system**: a fully configurable **Jataka Wealth Blueprint** (corrected drikpanchang-standard Vimshottari dasha 🕉️, market/sector/strategy matching, weekly/monthly/annual income bands, lifetime wealth curve) 📈, a **13-model zoo trained on each stock's ENTIRE history** (S&P 500: 24,781 days since 1927 🧠), plain-English interpretation under every chart 💡, 45-day sky events coupled to the selected stock 🌕, a TradingAgents-style **AI debate room** 🤖, and a searchable coverage matrix proving all 28 audited quant-repo concepts are accounted for 📚. All regression suites green (gateway 21/21 ×2, options 35/35, public 8/8) ✅ — full details in `ASTROTRADER.md` §24! 🌸🪐
+Version 1.3 (2026-10-28) answers one piece of feedback across the whole product: *every number must explain itself in plain, actionable English, and every analysis must use the instrument's entire history.* It also corrects the antardasha logic that v1.2 still got wrong for the birth mahadasha. Figures marked *Observed demo data* were captured with `ASTRO_DEMO_DATA=1` (deterministic synthetic prices, because the build container cannot reach Yahoo); they prove the pipeline, not a market edge.
+
+### 25.1 What shipped
+
+| # | Request | Where it lives | Plain-English benefit |
+|---|---------|----------------|------------------------|
+| U1 | More meaningful Quant Desk charts and heatmaps, each explained | Quant Desk → **Signals**, **Heatmaps**, **Risk & Regime**, **Portfolio**, **Forecast** (10 tabs total) | 24 classic rules (MACD, RSI, Bollinger W/M, SAR, Heikin-Ashi, Awesome, Dual Thrust, breakout, Ichimoku, Stochastic, ADX, Aroon, CCI, Donchian, Keltner, Turtle, OBV, Fibonacci, MA cross, z-score, grid…) each with today's signal and a full-history backtest; monthly, weekday × month, volatility, yearly-distribution and cross-asset correlation heatmaps; GARCH, Hurst, two-state regimes, Monte-Carlo cone, three VaR methods, JB/ADF/KPSS/Ljung-Box, top-5 drawdowns; min-var / max-Sharpe / risk-parity / HRP with efficient frontier. Every chart ends with **Shows · Means · Do** lines built from the data |
+| U2 | Suri cycles easier to understand and act on | Suri Cycles → **Today**, **Cycle clock**, **History**, This week, Lunar 30d | A "Today's reading" box (sky, price, meaning, what to do with levels); every metric explained inline; cycle clock with days to the next turning point; full-history statistics by moon phase, paksha, 27 nakshatras, Sun sign and retrograde periods with t-stats and an honest *signal / weak / noise* verdict |
+| U3 | Meaning of each 45-day sky event for the selected stock | Sky Events × Your Stock (now full width) | Each event carries an **event study on the stock's own history** (1/5/20-session returns vs normal, hit rate, volatility ratio, last 3 cases), classical meaning, sector rulers touched, and a symbol-specific action; timeline chart and filters |
+| U4 | Configurable jataka + correlation with the selected stock | Jataka → **Stock × Kundli** | Stock returns in each of the native's past MD/AD/PD periods, full-history transit-to-natal study (Jupiter/Saturn/Mars/Rahu over Moon, Lagna, Sun, 2nd and 11th lords, Sade Sati), synastry with the instrument's launch chart, verdict with timing windows |
+| U5 | "All the models in the world" in Model Lab | Model Lab (single full-history zoo) | ~47 models in 9 families: baselines, linear, kernel/neighbours, trees & boosting (XGBoost, LightGBM, CatBoost), neural (MLP; GRU/CNN reference-only), probabilistic (Bayesian ridge, Gaussian process), time series (ARIMA, SARIMAX with astro exogenous inputs, ETS, Holt-Winters, Theta), ensembles (top-5 average, stacking) and 7 direction classifiers × 2 horizons |
+| U6 | Popup explaining kundli symbols | Every North Indian chart → **ⓘ What do these symbols mean?** | Full legend (glyphs, ℞, combust, ASC, sign and house numbers, house themes, dignity colours) plus pinned per-glyph popups that work on tap and click |
+| U7 | Train from inception | Model Lab, Quant Desk, Cycles, Events, Stock × Kundli | All use `period="max"`; S&P 500 = 25,783 sessions since 1928 |
+| U8 | Re-audit the 28 repos | Coverage card | 170 concepts (95 implemented, 39 partial, 36 reference), every OpenBB Terminal menu included, honest status and exact location |
+| U9 | TradingAgents section | TradingAgents — Multi-Agent Desk | Analyst team (market, fundamentals, sentiment, news, astro) → bull/bear debate (1–3 rounds) → research manager → trader plan (entry, stop, T1/T2, size) → aggressive/neutral/conservative risk team → portfolio manager (BUY…SELL with confidence) and "what this means for you"; optional Claude narration when `ANTHROPIC_API_KEY` is set |
+| U10 | Astro analysis tab with markets, sectors, strategies, income and lifetime wealth | Jataka → Astro Analysis, **Markets & Income**, **Lifetime Wealth** | Fit scores with reasons for 6 markets, 9 sectors and 7 strategies; weekly/monthly/yearly income bands and "capital needed for £X/week"; an illustrative £ projection to age 85 modulated by dasha periods |
+| U11 | Location-based chart | Jataka form, Sky Today | 287-place gazetteer with IANA zones and historical DST, manual lat/lon/zone override, mean/true node, Lahiri/Raman/KP/tropical; Sky Today now uses *now* at a chosen observer (birth place, browser location, Ujjain or any city) |
+| U12 | Final 30/60/90/365-day strategy | ✦ Final Strategy & Income Plan (last section) | Natal vs today's charts and activated transits, a 9-input signal scoreboard, four horizon plans (stance, instruments, entry/stop/targets, sizing, key dates), the £500/week income plan, weekly routine and bottom line |
+| U13 | Docs + agent prompt | `docs/ASTROTRADER.md` §25, `docs/AGENT_PROMPT.md` | A 16-page build prompt for an AI engineering agent |
+
+### 25.2 Antardasha correction (supersedes §24.2)
+
+v1.2 compressed all nine antardashas of the **birth** mahadasha into its balance, so every native appeared to be born in *MD-lord / MD-lord*. Drikpanchang instead lays the birth mahadasha out at full length from its virtual start (birth − elapsed portion) and lists only the sub-periods still running at birth.
+
+```mermaid
+flowchart LR
+    A["Moon at birth<br/>Leo 29°47′ · Uttara Phalguni 1"] --> B["Sun MD lord<br/>23.4% elapsed · balance 4.59y"]
+    B --> C["Virtual MD start<br/>birth − 1.41y"]
+    C --> D["Lay out 9 ADs at full length<br/>Sun, Moon, Mars, Rahu, …"]
+    D --> E["Drop ADs ended before birth<br/>clip the running AD at birth"]
+    E --> F["Born in Sun MD / Rahu AD<br/>(v1.2 wrongly said Sun / Sun)"]
+    style A fill:#E3F2FD,stroke:#42A5F5,color:#263238
+    style B fill:#EDE7F6,stroke:#7E57C2,color:#263238
+    style C fill:#FFF3E0,stroke:#FB8C00,color:#263238
+    style D fill:#FFFDE7,stroke:#FDD835,color:#263238
+    style E fill:#FCE4EC,stroke:#EC407A,color:#263238
+    style F fill:#E8F5E9,stroke:#43A047,color:#263238
+```
+
+Later mahadashas are unchanged (full length, ADs start with their own lord, `AD = MD × lord / 120`, year = 365.2425 days). Verified for the default native: Lagna Aries 17°56′, current period on 2026-10-27 = **Rahu MD / Ketu AD (27-05-2026 → 15-06-2027) / Mars PD** (`tests/test_dasha.py`, `tests/test_jataka.py`).
+
+### 25.3 Other correctness fixes
+
+| Area | Bug | Fix |
+|------|-----|-----|
+| 📅 `/events` | Longitudes were tropical, so sign ingresses were ~24 days late; every Sun–Moon square or trine was labelled "Full Moon"; events were dated one day late | Sidereal Lahiri, only conjunction/opposition are lunations, events dated to the UTC day they occur |
+| 🔭 Swiss Ephemeris | `set_sid_mode` is process-global; one request using KP/Raman shifted other requests' positions | `sidereal_mode()` context manager restores Lahiri; cycle and Suri code pin Lahiri explicitly |
+| 🕰️ Birth time | Fixed offsets ignored DST for UK/US births | IANA zones via `zoneinfo` |
+| 🛡️ VaR | Parametric VaR had a sign error | Corrected in `quant_models.var_cvar` |
+| 🧭 Suri ingresses | Tuple-indexing bug left ingresses always empty | Fixed in `/suri/cycles` |
+| 📦 Backend boot | `pydantic-settings` missing from requirements | Added |
+
+### 25.4 New endpoints (all under `/api/v1`)
+
+| Router | Endpoints |
+|--------|-----------|
+| `routes_quant.py` | `/quant/signals/{s}`, `/quant/heatmaps/{s}`, `/quant/regime/{s}`, `/quant/portfolio/{s}`, `/quant/forecast/{s}` |
+| `routes_models.py` | `POST /models/zoo/train`, `/models/zoo/status`, `/models/zoo/catalog`, `POST /models/backtest` |
+| `routes_cycles.py` | `/cycles/clock`, `/cycles/stats/{s}`, `/cycles/insight/{s}`, `/events/study` |
+| `routes_jataka.py` | `/jataka/stock-correlation`, `/jataka/gazetteer` (plus new params on `/jataka/report`, `/planetary`) |
+| `routes_strategy.py` | `/strategy/agents/{s}` (= `/agents/{s}`), `/strategy/final/{s}` |
+
+### 25.5 QA evidence for v1.3 (*Observed demo data*, 2026-10-28)
+
+- Backend: **52 pytest tests green** (`test_dasha`, `test_quant`, `test_models`, `test_cycles`, `test_jataka`, `test_strategy`).
+- Frontend: `tsc --noEmit` clean; ESLint clean on all new files (three pre-existing `set-state-in-effect` warnings remain in older cards).
+- Model zoo on demo ^GSPC: 25,783 sessions, 87 features, 47 models trained / 2 skipped / 0 failed in 213 s; 5-block walk-forward with 12,600 out-of-sample days. As expected on random data, no model beats the naive mean.
+- Headless screenshots at 1400 px and 390 px of every section: no horizontal overflow, no console errors.
+- Offline mode: `ASTRO_DEMO_DATA=1` serves deterministic synthetic prices from each index's real inception date; the UI shows a "Demo mode" banner on statistical panels.
+
+**_plain-language:_** v1.3 makes the dashboard talk. Every chart now says what it shows, what it means for the stock you picked, and what to do next, using that stock's whole history. Your kundli is read the drikpanchang way, linked to the stock's actual past behaviour, and everything ends in one dated plan with an illustrative income path — always labelled as research, never a promise.
 
 ---
 
+<a id="section-22-ado-comment"></a>
+## 💬 26. Ready-to-Post ADO Comment
+
+> 🙏✨ Hi team! AstroTrader **v1.3** is ready — the dashboard now explains itself. Every chart ends with plain-English *Shows · Means · Do* lines 💡; the Quant Desk gained Signals (24 classic rules backtested on full history), Heatmaps, Risk & Regime and Portfolio tabs 📊; Model Lab runs **~47 models on each stock's entire history** (S&P 500 since 1928) 🧠; Suri cycles and every 45-day sky event are backed by an event study on the selected stock 🌕; the kundli is location- and DST-aware with a symbol legend, a Stock × Kundli correlation tab and the **drikpanchang-correct antardasha** 🕉️; a TradingAgents-style desk 🤖 and a final 30/60/90/365-day strategy with an illustrative £500/week income plan close the page 🎯. 52 backend tests green ✅ — details in `ASTROTRADER.md` §25. Educational research, not financial advice. 🌸🪐
+---
+
 <a id="section-23-governance"></a>
-## 🧾 25. Document Governance
+## 🧾 27. Document Governance
 
 | Field | Value |
 |-------|-------|
 | 📄 Document | ASTROTRADER.md — product design & operations |
-| 🔄 Version | v1.2 (direct replacement — adds Jataka Wealth Blueprint, model zoo, coverage suite; §24) |
-| 📅 Date | 2026-08-30 |
-| ✍️ Prepared by | Super Z (AI pair engineer) |
+| 🔄 Version | v1.3 (adds the explain-everything upgrade and the antardasha correction; §25) — previous v1.2 (§24) |
+| 📅 Date | 2026-10-28 |
+| ✍️ Prepared by | Claude (AI pair engineer); v1.2 by Super Z |
 | 🔎 Sources of truth | Live codebase (`src/`, `backend/app/`), gateway + public QA sweeps (2026-08-29), incident logs, astralastrologer.com concept notes |
 | 🏷️ Data labelling | All figures marked *Observed QA data* were captured live on 2026-08-29; *Illustrative example* marks constructed examples |
 | 🛡️ Classification | Educational exploration — planetary correlations have no proven predictive value; not financial advice |
 | 🔁 Review cadence | Re-validate QA metrics after any backend dependency bump (esp. yfinance / curl_cffi) |
-| 📦 Companion deliverables | `README.md` (repo landing), `scripts/test_gateway.sh`, `scripts/test_public.sh` |
+| 📦 Companion deliverables | `docs/AGENT_PROMPT.md` (multi-page AI build prompt), `README.md` (repo landing), `scripts/test_gateway.sh`, `scripts/test_public.sh` |

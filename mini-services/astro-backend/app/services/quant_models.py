@@ -142,7 +142,7 @@ def var_cvar(returns: np.ndarray, conf: float = 0.95,
 
     mu, sd = float(r.mean()), float(r.std(ddof=1))
     z = norm.ppf(alpha)
-    var_par = -(mu - z * sd)
+    var_par = -(mu + z * sd)  # z < 0 for the left tail
     es_z = _npdf(z) / alpha
     cvar_par = -(mu - sd * es_z)
 

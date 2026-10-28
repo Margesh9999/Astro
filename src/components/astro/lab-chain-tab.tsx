@@ -39,7 +39,7 @@ export function LabChainTab({ symbol, exp }: { symbol: string; exp: OptionExpira
       const c = await labApi.chain(sym, exp_date);
       setChain(c);
     } catch (e) {
-      setErr(String(e?.message ?? e));
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

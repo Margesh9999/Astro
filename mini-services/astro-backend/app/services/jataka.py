@@ -16,7 +16,9 @@ from typing import Dict, List, Optional, Tuple
 import logging
 import math
 
-from app.core.vedic import VedicCalculator
+from app.core.vedic import VedicCalculator, sky_positions, sidereal_mode, AYANAMSA_MODES
+from app.services.jataka_geo import (PLACES as GEO_PLACES, DEFAULT_PLACE, UJJAIN,
+                                     local_to_utc, resolve_place, search_places as geo_search)
 from app.services.dasha import VimshottariDasha, LORD_THEMES, DASHA_INTERPRETATIONS
 from app.services.astro_analysis import AstroAnalysis
 
@@ -25,47 +27,8 @@ logger = logging.getLogger(__name__)
 SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
          "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 
-# ---------------------------------------------------------------------------
-# Birth-place gazetteer (queryable via /jataka/places)
-# ---------------------------------------------------------------------------
-PLACES: List[Dict] = [
-    {"name": "Vallabh Vidyanagar, Gujarat, India", "lat": 22.5347, "lon": 73.13, "tz": 5.5},
-    {"name": "Ahmedabad, India", "lat": 23.0225, "lon": 72.5714, "tz": 5.5},
-    {"name": "Mumbai, India", "lat": 19.0760, "lon": 72.8777, "tz": 5.5},
-    {"name": "Delhi, India", "lat": 28.6139, "lon": 77.2090, "tz": 5.5},
-    {"name": "Surat, India", "lat": 21.1702, "lon": 72.8311, "tz": 5.5},
-    {"name": "Vadodara, India", "lat": 22.3072, "lon": 73.1812, "tz": 5.5},
-    {"name": "Rajkot, India", "lat": 22.3039, "lon": 70.8022, "tz": 5.5},
-    {"name": "Pune, India", "lat": 18.5204, "lon": 73.8567, "tz": 5.5},
-    {"name": "Bengaluru, India", "lat": 12.9716, "lon": 77.5946, "tz": 5.5},
-    {"name": "Chennai, India", "lat": 13.0827, "lon": 80.2707, "tz": 5.5},
-    {"name": "Hyderabad, India", "lat": 17.3850, "lon": 78.4867, "tz": 5.5},
-    {"name": "Kolkata, India", "lat": 22.5726, "lon": 88.3639, "tz": 5.5},
-    {"name": "Jaipur, India", "lat": 26.9124, "lon": 75.7873, "tz": 5.5},
-    {"name": "Ujjain, India", "lat": 23.1793, "lon": 75.7849, "tz": 5.5},
-    {"name": "Varanasi, India", "lat": 25.3176, "lon": 82.9739, "tz": 5.5},
-    {"name": "London, United Kingdom", "lat": 51.5074, "lon": -0.1278, "tz": 0.0},
-    {"name": "Manchester, United Kingdom", "lat": 53.4808, "lon": -2.2426, "tz": 0.0},
-    {"name": "Birmingham, United Kingdom", "lat": 52.4862, "lon": -1.8904, "tz": 0.0},
-    {"name": "Edinburgh, United Kingdom", "lat": 55.9533, "lon": -3.1883, "tz": 0.0},
-    {"name": "Leicester, United Kingdom", "lat": 52.6369, "lon": -1.1398, "tz": 0.0},
-    {"name": "New York, USA", "lat": 40.7128, "lon": -74.0060, "tz": -5.0},
-    {"name": "San Francisco, USA", "lat": 37.7749, "lon": -122.4194, "tz": -8.0},
-    {"name": "Chicago, USA", "lat": 41.8781, "lon": -87.6298, "tz": -6.0},
-    {"name": "Houston, USA", "lat": 29.7604, "lon": -95.3698, "tz": -6.0},
-    {"name": "Los Angeles, USA", "lat": 34.0522, "lon": -118.2437, "tz": -8.0},
-    {"name": "Toronto, Canada", "lat": 43.6532, "lon": -79.3832, "tz": -5.0},
-    {"name": "Dubai, UAE", "lat": 25.2048, "lon": 55.2708, "tz": 4.0},
-    {"name": "Singapore", "lat": 1.3521, "lon": 103.8198, "tz": 8.0},
-    {"name": "Hong Kong", "lat": 22.3193, "lon": 114.1694, "tz": 8.0},
-    {"name": "Tokyo, Japan", "lat": 35.6762, "lon": 139.6503, "tz": 9.0},
-    {"name": "Sydney, Australia", "lat": -33.8688, "lon": 151.2093, "tz": 10.0},
-    {"name": "Frankfurt, Germany", "lat": 50.1109, "lon": 8.6821, "tz": 1.0},
-    {"name": "Paris, France", "lat": 48.8566, "lon": 2.3522, "tz": 1.0},
-    {"name": "Zurich, Switzerland", "lat": 47.3769, "lon": 8.5417, "tz": 1.0},
-    {"name": "Johannesburg, South Africa", "lat": -26.2041, "lon": 28.0473, "tz": 2.0},
-    {"name": "Nairobi, Kenya", "lat": -1.2921, "lon": 36.8219, "tz": 3.0},
-]
+# Birth-place gazetteer lives in jataka_geo (~290 cities, IANA timezones, DST-aware)
+PLACES = GEO_PLACES
 
 # ---------------------------------------------------------------------------
 # Classical planetary dignities
@@ -183,87 +146,69 @@ class JatakaEngine:
         self.default_birth = {
             "name": "Margesh",
             "date": "1994-04-23", "time": "06:45",
-            "place": "Vallabh Vidyanagar, Gujarat, India",
-            "lat": 22.5347, "lon": 73.13, "tz": 5.5,
+            "place": DEFAULT_PLACE["name"],
+            "lat": DEFAULT_PLACE["lat"], "lon": DEFAULT_PLACE["lon"],
+            "tz_name": DEFAULT_PLACE["tz_name"], "tz": 5.5,
         }
 
     # ------------------------------------------------------------------
     def search_places(self, q: str) -> List[Dict]:
-        ql = (q or "").strip().lower()
-        if not ql:
-            return PLACES[:10]
-        starts = [p for p in PLACES if p["name"].lower().startswith(ql)]
-        contains = [p for p in PLACES if ql in p["name"].lower() and p not in starts]
-        return (starts + contains)[:10]
+        return geo_search(q)
 
     def _resolve_place(self, place: str) -> Dict:
-        for p in PLACES:
-            if p["name"].lower() == (place or "").lower():
-                return p
-        hits = self.search_places(place or "")
-        return hits[0] if hits else {"name": place or "Ujjain, India", "lat": 23.1793, "lon": 75.7849, "tz": 5.5}
+        hit = resolve_place(place)
+        if hit:
+            return hit
+        # unknown free-text place: keep the label, fall back to Ujjain coordinates
+        # (the caller can override with lat/lon/tz) and say so in the payload
+        return {**UJJAIN, "name": place or UJJAIN["name"], "unresolved": True}
 
     # ------------------------------------------------------------------
     def compute_chart(self, name: str = "", date: str = "", time: str = "",
                       place: str = "", lat: Optional[float] = None,
-                      lon: Optional[float] = None, tz: Optional[float] = None) -> Dict:
-        """Full sidereal chart for ANY configurable birth data."""
-        b = {**self.default_birth, "name": name or "Native", "date": date or self.default_birth["date"],
-             "time": time or self.default_birth["time"], "place": place or self.default_birth["place"]}
+                      lon: Optional[float] = None, tz: Optional[float] = None,
+                      tz_name: str = "", node: str = "mean", ayanamsa: str = "lahiri") -> Dict:
+        """Full sidereal chart for ANY configurable birth data.
+
+        Time zone: ``tz`` (manual numeric offset) wins; otherwise the IANA zone of
+        the resolved place (or ``tz_name``) converts local → UTC with historical DST.
+        """
+        d0 = self.default_birth
+        b = {"name": (name or "").strip() or d0["name"], "date": date or d0["date"],
+             "time": time or d0["time"], "place": place or d0["place"]}
         p = self._resolve_place(b["place"])
-        if lat is not None: p["lat"] = lat
-        if lon is not None: p["lon"] = lon
-        if tz is not None: p["tz"] = tz
-        # adopt resolved coordinates WITHOUT clobbering the native's name
-        # (place dicts carry their own "name" key — the old b.update(p) erased it)
-        b["place"] = p["name"]
-        b["lat"], b["lon"], b["tz"] = p["lat"], p["lon"], p["tz"]
-
-        y, m, d = [int(x) for x in b["date"].split("-")]
-        hh, mm = [int(x) for x in b["time"].split(":")]
-        local = datetime(y, m, d, hh, mm)
-        utc_dt = local - timedelta(hours=b["tz"])
+        if lat is not None:
+            p["lat"] = float(lat)
+        if lon is not None:
+            p["lon"] = float(lon)
+        if tz_name:
+            p["tz_name"] = tz_name
+        utc_dt, off, dst, tz_label = local_to_utc(b["date"], b["time"], p.get("tz_name"), tz)
         jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day,
-                        utc_dt.hour + utc_dt.minute / 60.0)
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-
-        grahas = {"Sun": swe.SUN, "Moon": swe.MOON, "Mercury": swe.MERCURY, "Venus": swe.VENUS,
-                  "Mars": swe.MARS, "Jupiter": swe.JUPITER, "Saturn": swe.SATURN, "Rahu": swe.MEAN_NODE}
-        positions = {}
-        for gname, pid in grahas.items():
-            data = self.vedic.calculate_planet_position_vedic(pid, jd)
-            positions[gname] = data
-            if gname == "Rahu":
-                klon = (data["longitude"] + 180) % 360
-                nak = self.vedic.calculate_nakshatra(klon)
-                positions["Ketu"] = {
-                    "longitude": klon, "sign": SIGNS[int(klon // 30)],
-                    "sign_number": int(klon // 30), "degree_within_sign": klon % 30,
-                    "is_retrograde": True, "nakshatra": nak["nakshatra"],
-                    "nakshatra_index": nak["nakshatra_index"], "pada": nak["pada"],
-                }
-        cusps, ascmc = swe.houses_ex(jd, p["lat"], p["lon"], b'W', flags=swe.FLG_SIDEREAL)
-        asc = ascmc[0] % 360
-        anak = self.vedic.calculate_nakshatra(asc)
-        positions["Lagna"] = {
-            "longitude": asc, "sign": SIGNS[int(asc // 30)], "sign_number": int(asc // 30),
-            "degree_within_sign": asc % 30, "is_retrograde": False,
-            "nakshatra": anak["nakshatra"], "nakshatra_index": anak["nakshatra_index"], "pada": anak["pada"],
-        }
-        lagna_sign = int(asc // 30)
-        for _, pos in positions.items():
-            sn = pos.get("sign_number", int(pos["longitude"] // 30))
+                        utc_dt.hour + utc_dt.minute / 60.0 + utc_dt.second / 3600.0)
+        node = node if node in ("mean", "true") else "mean"
+        ayanamsa = ayanamsa if ayanamsa in AYANAMSA_MODES else "lahiri"
+        sky = sky_positions(jd, ayanamsa, node, p["lat"], p["lon"])
+        positions = sky["positions"]
+        lagna_sign = positions["Lagna"]["sign_number"]
+        for g, pos in positions.items():
+            sn = pos["sign_number"]
             pos["house"] = (sn - lagna_sign) % 12 + 1
-            pos["dignity"], pos["dignity_score"] = _dignity(_, sn, pos.get("degree_within_sign", 0))
+            pos["dignity"], pos["dignity_score"] = _dignity(g, sn, pos.get("degree_within_sign", 0))
+            for k in ("speed_longitude", "latitude", "position_in_nakshatra"):
+                if k in pos:
+                    pos[k] = round(float(pos[k]), 6)
 
         moon = positions["Moon"]
-        dasha = VimshottariDasha(moon["longitude"], utc_dt)
+        dasha = VimshottariDasha(moon["longitude"], utc_dt, off)
         return {
             "birth": {"name": b["name"], "date": b["date"], "time": b["time"],
-                      "place": p["name"], "lat": p["lat"], "lon": p["lon"], "tz": p["tz"],
-                      "utc": utc_dt.isoformat()},
-            "ayanamsa_mode": "Lahiri (Chitrapaksha)",
-            "ayanamsa": round(swe.get_ayanamsa_ut(jd), 4),
+                      "place": p["name"], "lat": p["lat"], "lon": p["lon"], "tz": off,
+                      "tz_name": tz_label, "dst": dst, "utc": utc_dt.isoformat(),
+                      "place_resolved": not p.get("unresolved", False)},
+            "settings": {"ayanamsa": ayanamsa, "node": node, "house_system": "whole-sign (Lagna sign = house 1)"},
+            "ayanamsa_mode": sky["ayanamsa_label"],
+            "ayanamsa": round(sky["ayanamsa"], 4),
             "jd": jd,
             "positions": positions,
             "lagna_sign": lagna_sign,
@@ -423,17 +368,12 @@ class JatakaEngine:
         }
 
     # ------------------------------------------------------------------
-    def transits_today(self, positions: Dict) -> Dict:
+    def transits_today(self, positions: Dict, ayanamsa: str = "lahiri", node: str = "mean") -> Dict:
         """Today's planetary positions vs natal — conjunctions to natal grahas."""
         now = datetime.utcnow()
-        jd = swe.julday(now.year, now.month, now.day, now.hour / 24.0)
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-        transits = {}
-        for g, pid in {"Sun": swe.SUN, "Moon": swe.MOON, "Mercury": swe.MERCURY, "Venus": swe.VENUS,
-                       "Mars": swe.MARS, "Jupiter": swe.JUPITER, "Saturn": swe.SATURN,
-                       "Rahu": swe.MEAN_NODE}.items():
-            data = self.vedic.calculate_planet_position_vedic(pid, jd)
-            transits[g] = data
+        jd = swe.julday(now.year, now.month, now.day, now.hour + now.minute / 60.0)
+        transits = sky_positions(jd, ayanamsa, node)["positions"]
+        transits.pop("Ketu", None)
         hits = []
         for tg, tpos in transits.items():
             for ng, npos in positions.items():
@@ -493,32 +433,40 @@ class JatakaEngine:
 
     # ------------------------------------------------------------------
     def full_report(self, symbol: str = "^GSPC", symbol_name: str = "S&P 500",
-                    capital: float = 50000.0, target_weekly: float = 500.0, **kwargs) -> Dict:
+                    capital: float = 50000.0, target_weekly: float = 500.0,
+                    monthly_savings: float = 500.0, base_return: float = 0.08, **kwargs) -> Dict:
         chart = self.compute_chart(**kwargs)
         positions = chart["positions"]
         dasha = chart["dasha"]
+        settings = chart["settings"]
         strengths = self.strengths(positions)
         cur = dasha.current()
-        def ser_md(md):
-            return {"lord": md["lord"], "glyph": md["glyph"],
-                    "start": md["start"].strftime("%d-%m-%Y"), "end": md["end"].strftime("%d-%m-%Y"),
-                    "years": md["years"],
-                    "antardashas": [{"lord": a["lord"], "glyph": a["glyph"],
-                                     "start": a["start"].strftime("%d-%m-%Y"),
-                                     "end": a["end"].strftime("%d-%m-%Y"), "years": a["years"]} for a in md["antardashas"]]}
         market_recs = self.market_recommendations(positions, strengths)
         income = self.income_forecast(positions, strengths, dasha, capital, target_weekly)
         # Astro Analysis master guide engine (BPHS + Jaimini + Nakshatra/KV +
         # Shadbala/Bhavabala/Ashtakvarga + KP + Yogini + Money Blueprint)
+        mode = AYANAMSA_MODES[settings["ayanamsa"]][0] or swe.SIDM_LAHIRI
         try:
-            analysis = AstroAnalysis(ayanamsa_mode=swe.SIDM_LAHIRI).build(
-                chart, dasha, strengths, market_recs, income, symbol, symbol_name)
+            with sidereal_mode(mode):  # restores Lahiri even on error
+                analysis = AstroAnalysis(ayanamsa_mode=mode).build(
+                    chart, dasha, strengths, market_recs, income, symbol, symbol_name)
         except Exception as exc:  # never let the analysis pack break the report
             logger.exception("astro analysis build failed: %s", exc)
             analysis = {"error": str(exc)}
+        try:
+            from app.services.jataka_plan import build_plan
+            plan = build_plan(chart, strengths, analysis if "error" not in analysis else {}, dasha,
+                              capital=capital, target_weekly=target_weekly,
+                              monthly_savings=monthly_savings, base_return=base_return)
+        except Exception as exc:
+            logger.exception("jataka plan failed: %s", exc)
+            plan = {"error": str(exc)}
+        tree = dasha.serialize()
+        tn = dasha.trading_now()
         return {
             "success": True,
             "birth": chart["birth"],
+            "settings": settings,
             "ayanamsa_mode": chart["ayanamsa_mode"],
             "ayanamsa": chart.get("ayanamsa"),
             "lagna_sign": chart["lagna_sign"],
@@ -526,26 +474,26 @@ class JatakaEngine:
             "strengths": strengths,
             "verdict": analysis.get("verdict"),
             "planetary_notes": analysis.get("planetary_notes"),
-            "dasha_tree": {"first_lord": dasha.first_lord,
-                           "balance_years": dasha.balance_years,
-                           "moon_nakshatra_index": dasha.nak_index,
-                           "pada": dasha.pada,
-                           "mahadashas": [ser_md(md) for md in dasha.tree]},
+            "dasha_tree": tree,
             "current_dasha": {
                 "mahadasha": cur["mahadasha"]["lord"] if cur["mahadasha"] else None,
                 "antardasha": cur["antardasha"]["lord"] if cur["antardasha"] else None,
                 "pratyantardasha": cur["pratyantardasha"]["lord"] if cur["pratyantardasha"] else None,
-                "md_start": cur["mahadasha"]["start"].strftime("%d-%m-%Y") if cur["mahadasha"] else None,
-                "md_end": cur["mahadasha"]["end"].strftime("%d-%m-%Y") if cur["mahadasha"] else None,
-                "ad_start": cur["antardasha"]["start"].strftime("%d-%m-%Y") if cur["antardasha"] else None,
-                "ad_end": cur["antardasha"]["end"].strftime("%d-%m-%Y") if cur["antardasha"] else None,
+                "md_start": tn["mahadasha"]["start"] if tn["mahadasha"] else None,
+                "md_end": tn["mahadasha"]["end"] if tn["mahadasha"] else None,
+                "ad_start": tn["antardasha"]["start"] if tn["antardasha"] else None,
+                "ad_end": tn["antardasha"]["end"] if tn["antardasha"] else None,
+                "pd_start": tn["pratyantardasha"]["start"] if tn["pratyantardasha"] else None,
+                "pd_end": tn["pratyantardasha"]["end"] if tn["pratyantardasha"] else None,
+                "trading": tn,
                 "interpretation": dasha.interpretation(),
             },
             "market_recommendations": market_recs,
             "income_forecast": income,
             "lifetime_wealth": self.lifetime_wealth(dasha),
-            "transits_today": self.transits_today(positions),
+            "transits_today": self.transits_today(positions, settings["ayanamsa"], settings["node"]),
             "synthesis": self.synthesis(positions, strengths, dasha, symbol, symbol_name,
                                         capital, target_weekly),
             "astro_analysis": analysis,
+            "plan": plan,
         }

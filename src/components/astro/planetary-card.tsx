@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,38 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { PlanetaryResponse } from '@/lib/astro/types';
 import { PLANET_META, SIGN_GLYPHS, fmtDeg } from './planet-meta';
 import { NorthIndianChart, type KundaliPlanet } from './north-indian-chart';
-import { Orbit, Star } from 'lucide-react';
+import { LocateFixed, MapPin, Orbit, Star } from 'lucide-react';
+import { jatakaApi, loadBirth, type JatakaPlaceV13, type PlanetaryResponseV13 } from '@/lib/astro/api-jataka';
+
+// ── Sky Today observer: birth place (default) → browser location if already permitted → Ujjain ──
+type Observer = { kind: 'birth' | 'geo' | 'ujjain' | 'city'; label: string; lat?: number; lon?: number; place?: string };
+const UJJAIN: Observer = { kind: 'ujjain', label: 'Ujjain (traditional meridian)', place: 'Ujjain' };
+const OBS_KEY = 'astrotrader.sky.observer.v1';
+let birthObsCache: Observer | null = null;
+function birthObserver(): Observer {
+  if (!birthObsCache) {
+    const b = loadBirth();
+    birthObsCache = b.lat != null && b.lon != null
+      ? { kind: 'birth', label: `Birth place · ${b.place.split(',')[0]}`, lat: b.lat, lon: b.lon, place: b.place }
+      : { kind: 'birth', label: `Birth place · ${b.place.split(',')[0]}`, place: b.place };
+  }
+  return birthObsCache;
+}
+let savedObsCache: Observer | null | undefined;
+function savedObserver(): Observer | null {
+  if (savedObsCache === undefined) {
+    try {
+      const raw = window.localStorage.getItem(OBS_KEY);
+      savedObsCache = raw ? (JSON.parse(raw) as Observer) : null;
+    } catch {
+      savedObsCache = null;
+    }
+  }
+  return savedObsCache;
+}
+const noopSub = () => () => {};
+const fmtLat = (v: number) => `${Math.abs(v).toFixed(2)}°${v >= 0 ? 'N' : 'S'}`;
+const fmtLon = (v: number) => `${Math.abs(v).toFixed(2)}°${v >= 0 ? 'E' : 'W'}`;
 
 function ZodiacWheel({ data, vedic }: { data: PlanetaryResponse; vedic: boolean }) {
   const CX = 170, CY = 170;
@@ -130,12 +161,14 @@ function VedicKundali({ data }: { data: PlanetaryResponse }) {
       dignity: p.dignity,
       nakshatra: p.nakshatra,
       pada: p.pada,
+      combust: (p as { combust?: boolean }).combust,
     }));
 
   return (
     <div className="flex flex-col items-center gap-1">
       <NorthIndianChart
         lagnaSignNumber={lagnaSign}
+        lagnaDegree={lagna?.degree_within_sign}
         planets={planets}
         size={352}
         title="Kundali · North Indian"
@@ -155,6 +188,67 @@ export function PlanetaryCard({
 }) {
   const [tab, setTab] = useState('chart');
 
+  // observer location (client-only snapshot of saved choice / birth place)
+  const initialObs = useSyncExternalStore(noopSub, () => savedObserver() ?? birthObserver(), () => null);
+  const [obsOverride, setObsOverride] = useState<Observer | null>(null);
+  const observer = obsOverride ?? initialObs;
+  const [sky, setSky] = useState<{ key: string; data: PlanetaryResponseV13 } | null>(null);
+  const [tick, setTick] = useState(0);
+  const [geoErr, setGeoErr] = useState<string | null>(null);
+  const [cityQ, setCityQ] = useState('');
+  const [cities, setCities] = useState<JatakaPlaceV13[]>([]);
+  const seq = useRef(0);
+  const obsKey = observer ? `${observer.kind}|${observer.lat}|${observer.lon}|${observer.place}|${tick}` : '';
+
+  const chooseObserver = (o: Observer) => {
+    setObsOverride(o);
+    try { window.localStorage.setItem(OBS_KEY, JSON.stringify(o)); } catch { /* ignore */ }
+  };
+  const requestMyLocation = () => {
+    if (!('geolocation' in navigator)) { setGeoErr('Location not available in this browser'); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setGeoErr(null); chooseObserver({ kind: 'geo', label: 'My location', lat: pos.coords.latitude, lon: pos.coords.longitude }); },
+      () => setGeoErr('Location permission denied — using the selected place'),
+      { maximumAge: 600000, timeout: 8000 },
+    );
+  };
+
+  // if the browser already granted geolocation and the user hasn't chosen otherwise, use it silently
+  useEffect(() => {
+    if (!vedic || obsOverride || savedObserver()) return;
+    const perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+    perms?.query({ name: 'geolocation' as PermissionName }).then((st) => {
+      if (st.state === 'granted') {
+        navigator.geolocation.getCurrentPosition((pos) =>
+          setObsOverride({ kind: 'geo', label: 'My location', lat: pos.coords.latitude, lon: pos.coords.longitude }));
+      }
+    }).catch(() => { /* permissions API unsupported */ });
+  }, [vedic, obsOverride]);
+
+  // fetch "now" for the observer; refresh every 5 minutes
+  useEffect(() => {
+    if (!vedic || !observer) return;
+    const s = ++seq.current;
+    jatakaApi
+      .skyNow({ lat: observer.lat, lon: observer.lon, place: observer.lat == null ? observer.place : observer.label })
+      .then((d) => { if (s === seq.current) setSky({ key: obsKey, data: d }); })
+      .catch(() => { /* keep the dashboard's copy */ });
+    const t = setTimeout(() => setTick((x) => x + 1), 5 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [vedic, obsKey, observer]);
+
+  useEffect(() => {
+    if (cityQ.trim().length < 2) return;
+    const t = setTimeout(() => {
+      jatakaApi.places(cityQ).then((r) => setCities(r.places ?? [])).catch(() => setCities([]));
+    }, 220);
+    return () => clearTimeout(t);
+  }, [cityQ]);
+
+  const shown: PlanetaryResponseV13 | null = (vedic && sky?.data) || data;
+  const obsInfo = (shown as PlanetaryResponseV13 | null)?.observer;
+  const utc = obsInfo?.utc ? new Date(obsInfo.utc) : null;
+
   return (
     <Card className="vedic-card flex h-full flex-col">
       <CardHeader className="pb-2">
@@ -169,24 +263,78 @@ export function PlanetaryCard({
               Sky Today — Real Positions
             </CardTitle>
           </div>
-          {data && vedic && (
+          {shown && vedic && (
             <Badge variant="outline" className="border-[#dcc08a] bg-[#f9efd8] text-[10px] text-[#8a6a3a]">
-              Ayanamsa {data.ayanamsa?.toFixed(4)}°
+              Ayanamsa {shown.ayanamsa?.toFixed(4)}°
             </Badge>
           )}
         </div>
         <CardDescription className="text-[#97795a]">
           {vedic
-            ? 'Sidereal longitudes via Swiss Ephemeris + Lahiri ayanamsa, incl. Rahu/Ketu & the day’s Lagna (noon · Ujjain meridian)'
+            ? 'Sidereal (Lahiri) positions right now via Swiss Ephemeris, incl. Rahu/Ketu, with the Lagna rising over the place you choose'
             : 'Geocentric tropical longitudes via Swiss Ephemeris'}
         </CardDescription>
+        {vedic && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-[#c98a2e]" />
+            <select
+              aria-label="Observer location for the Lagna"
+              className="h-7 max-w-[60vw] rounded-md border border-[#ecdec2] bg-white px-1.5 text-[11px] text-[#5c4327]"
+              value={observer?.kind === 'city' ? 'city' : observer?.kind ?? 'birth'}
+              onChange={(e) => {
+                const k = e.target.value;
+                if (k === 'birth') chooseObserver(birthObserver());
+                else if (k === 'ujjain') chooseObserver(UJJAIN);
+                else if (k === 'geo') requestMyLocation();
+              }}
+            >
+              <option value="birth">{birthObserver().label}</option>
+              <option value="geo">My location (browser)</option>
+              <option value="ujjain">Ujjain (traditional)</option>
+              {observer?.kind === 'city' && <option value="city">{observer.label}</option>}
+            </select>
+            <div className="relative">
+              <input
+                value={cityQ}
+                onChange={(e) => setCityQ(e.target.value)}
+                placeholder="other city…"
+                aria-label="Search another city"
+                className="h-7 w-28 rounded-md border border-[#ecdec2] bg-white px-1.5 text-[11px] text-[#5c4327]"
+              />
+              {cityQ.trim().length >= 2 && cities.length > 0 && (
+                <div className="warm-scroll absolute right-0 z-30 mt-1 max-h-44 w-56 overflow-y-auto rounded-md border border-[#ecdec2] bg-[#fffdf6] shadow-lg">
+                  {cities.map((c) => (
+                    <button key={c.name} type="button"
+                            className="block w-full px-2 py-1 text-left text-[11px] text-[#5c4327] hover:bg-[#f9efd8]"
+                            onClick={() => { chooseObserver({ kind: 'city', label: c.name.split(',')[0], lat: c.lat, lon: c.lon, place: c.name }); setCityQ(''); setCities([]); }}>
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button type="button" onClick={requestMyLocation} title="Use my location"
+                    className="rounded-md border border-[#ecdec2] bg-[#fffdf6] p-1 text-[#8a6a3a] hover:bg-[#f9efd8]">
+              <LocateFixed className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+        {vedic && obsInfo && utc && (
+          <p className="mt-1 text-[10px] leading-snug text-[#97795a]">
+            Sky at <b>{utc.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b> your time
+            ({obsInfo.utc.slice(11, 16)} UTC, {obsInfo.utc.slice(0, 10)}) · Lagna rising over <b>{obsInfo.place}</b>{' '}
+            ({fmtLat(obsInfo.lat)}, {fmtLon(obsInfo.lon)}) · {obsInfo.ayanamsa}, {obsInfo.node} node · refreshes every 5 min.
+            The Lagna changes sign about every 2 hours and depends on place; the planets don’t.
+            {geoErr && <span className="text-[#a34332]"> {geoErr}.</span>}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
-        {loading && !data ? (
+        {loading && !shown ? (
           <div className="flex flex-1 items-center justify-center py-10">
             <Skeleton className="h-64 w-64 rounded-full bg-[#efdfbc]" />
           </div>
-        ) : !data ? (
+        ) : !shown ? (
           <div className="flex flex-1 items-center justify-center py-10 text-sm text-[#97795a]">
             Ephemeris data unavailable.
           </div>
@@ -200,12 +348,12 @@ export function PlanetaryCard({
                 Positions
               </TabsTrigger>
               <TabsTrigger value="aspects" className="text-xs data-[state=active]:bg-[#fffdf6]">
-                Aspects ({data.aspects.length})
+                Aspects ({shown.aspects.length})
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="chart" className="mt-0">
-              {vedic ? <VedicKundali data={data} /> : <ZodiacWheel data={data} vedic={vedic} />}
+              {vedic ? <VedicKundali data={shown} /> : <ZodiacWheel data={shown} vedic={vedic} />}
             </TabsContent>
 
             <TabsContent value="positions" className="mt-0">
@@ -223,7 +371,7 @@ export function PlanetaryCard({
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(data.planetary_positions).map(([name, p]) => (
+                    {Object.entries(shown.planetary_positions).map(([name, p]) => (
                       <tr key={name} className="border-t border-[#f0e4cc] hover:bg-[#f9f1de]/70">
                         <td className="px-3 py-2">
                           <span style={{ color: PLANET_META[name]?.color ?? '#7a6a58' }} className="mr-1.5">
@@ -254,13 +402,13 @@ export function PlanetaryCard({
 
             <TabsContent value="aspects" className="mt-0">
               <ScrollArea className="warm-scroll h-[300px] rounded-md border border-[#f0e4cc] bg-[#fffdf6]/60 p-3">
-                {data.aspects.length === 0 ? (
+                {shown.aspects.length === 0 ? (
                   <p className="py-8 text-center text-xs text-[#97795a]">
                     No major aspects within orb today.
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {data.aspects
+                    {shown.aspects
                       .slice()
                       .sort((a, b) => a.orb_used - b.orb_used)
                       .map((a, i) => (

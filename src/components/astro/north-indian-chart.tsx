@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PLANET_META, SIGNS, fmtDeg, PLANET_GUIDES, HOUSE_GUIDES, DIGNITY_GUIDES } from './planet-meta';
+import { KundliLegend, HOUSE_MONEY, dignityColour } from './kundli-legend';
 
 export interface KundaliPlanet {
   name: string;
@@ -15,6 +16,8 @@ export interface KundaliPlanet {
   dignity?: string;
   nakshatra?: string;
   pada?: number;
+  /** within the classical orb of the Sun (asta) */
+  combust?: boolean;
 }
 
 interface HouseGeom {
@@ -70,13 +73,21 @@ export function NorthIndianChart({
   planets,
   size = 360,
   title,
+  showLegend = true,
+  lagnaDegree,
 }: {
   lagnaSignNumber: number;
   planets: KundaliPlanet[];
   size?: number;
   title?: string;
+  /** render the always-available "What do these symbols mean?" legend button */
+  showLegend?: boolean;
+  /** Lagna degree within its sign, shown next to the ASC marker */
+  lagnaDegree?: number;
 }) {
   const [popup, setPopup] = useState<KundaliPlanet | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const close = () => { setPopup(null); setPinned(false); };
 
   // house (1..12) -> rasi number (1..12)
   const houseSign = (h: number) => (lagnaSignNumber + h - 1) % 12;
@@ -115,8 +126,9 @@ export function NorthIndianChart({
           </radialGradient>
         </defs>
 
-        {/* soft ivory field + double gold frame */}
-        <rect x="4" y="4" width="392" height="392" rx="6" fill="url(#kundaliBg)" stroke="url(#kundaliFrame)" strokeWidth="2.5" />
+        {/* soft ivory field + double gold frame (tap the empty field to dismiss a popup) */}
+        <rect x="4" y="4" width="392" height="392" rx="6" fill="url(#kundaliBg)" stroke="url(#kundaliFrame)" strokeWidth="2.5"
+              onClick={close} />
         <rect x="10" y="10" width="380" height="380" fill="none" stroke="#dcc08a" strokeWidth="0.8" />
 
         {/* Lagna house wash */}
@@ -133,6 +145,12 @@ export function NorthIndianChart({
         <line x1="390" y1="10" x2="10" y2="390" className="kundali-line" />
         {/* inner frame on the diamond vertices */}
         <polygon points="200,10 390,200 200,390 10,200" fill="none" stroke="#dcc08a" strokeWidth="0.6" transform="translate(200 200) scale(0.985) translate(-200 -200)" />
+
+        {/* Lagna marker — house 1 is always the top-centre diamond */}
+        <text x="200" y="30" textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700"
+              fill="#b0763a" letterSpacing="1.5" style={{ pointerEvents: 'none' }}>
+          ASC{lagnaDegree !== undefined ? ` ${fmtDeg(lagnaDegree, false)}` : ''}
+        </text>
 
         {/* centre medallion */}
         <circle cx={CX} cy={CY} r="5.5" fill="#fffdf6" stroke="#c9962e" strokeWidth="1.4" />
@@ -174,9 +192,20 @@ export function NorthIndianChart({
                   <g
                     key={p.name}
                     className="cursor-pointer"
-                    onClick={() => setPopup(popup?.name === p.name ? null : p)}
-                    onMouseEnter={() => setPopup(p)}
-                    onMouseLeave={() => setPopup((cur) => (cur?.name === p.name ? null : cur))}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${p.name} in ${SIGNS[p.signNumber]} — show meaning`}
+                    // tap (touch) and click toggle; hover only for a real mouse, so a tap's
+                    // emulated mouseenter can't open-then-close the popup on mobile
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // a click/tap pins the popup; clicking the same pinned glyph again closes it
+                      if (pinned && popup?.name === p.name) { setPopup(null); setPinned(false); }
+                      else { setPopup(p); setPinned(true); }
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPopup(p); setPinned(true); } }}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse' && !pinned) setPopup(p); }}
+                    onPointerLeave={(e) => { if (e.pointerType === 'mouse' && !pinned) setPopup((cur) => (cur?.name === p.name ? null : cur)); }}
                   >
                     {/* invisible hit area so hover/click is easy */}
                     <circle cx={px} cy={py} r="17" fill="transparent" />
@@ -205,7 +234,14 @@ export function NorthIndianChart({
                       {p.retrograde && (
                         <tspan fill="#cf5b54" fontWeight="700">℞</tspan>
                       )}
+                      {p.combust && (
+                        <tspan fill="#e07b2a" fontWeight="700">c</tspan>
+                      )}
                     </text>
+                    {dignityColour(p.dignity) && (
+                      <circle cx={px} cy={py + 21} r="2.3" fill={dignityColour(p.dignity) ?? undefined}
+                              style={{ pointerEvents: 'none' }} />
+                    )}
                   </g>
                 );
               })}
@@ -228,6 +264,8 @@ export function NorthIndianChart({
               {SIGNS[popup.signNumber]} {fmtDeg(popup.degree)}
               {popup.retrograde ? ' ℞' : ''}
             </span>
+            <button type="button" onClick={close} aria-label="Close"
+                    className="pointer-events-auto ml-1 rounded px-1.5 text-sm leading-none text-[#97795a] hover:bg-[#f7ecd4]">×</button>
           </div>
           <p className="mt-1 text-[11px] leading-snug text-[#5c4327]">
             {PLANET_GUIDES[popup.name]?.meaning ?? 'A graha of the Vedic sky.'}
@@ -236,6 +274,7 @@ export function NorthIndianChart({
             {popup.house !== undefined && (
               <p>
                 <span className="font-semibold">House {popup.house}:</span> {HOUSE_GUIDES[popup.house]}
+                <span className="text-[#97795a]"> · money: {HOUSE_MONEY[popup.house]}</span>
               </p>
             )}
             {popup.nakshatra && (
@@ -250,6 +289,12 @@ export function NorthIndianChart({
                 {DIGNITY_GUIDES[popup.dignity] ?? 'classical strength assessment'}
               </p>
             )}
+            {popup.retrograde && (
+              <p><span className="font-semibold text-[#cf5b54]">℞ Retrograde:</span> its themes are under review — re-check before acting.</p>
+            )}
+            {popup.combust && (
+              <p><span className="font-semibold text-[#e07b2a]">c Combust:</span> too close to the Sun — acts weaker than its sign suggests.</p>
+            )}
             <p className="rounded bg-[#fdf8ec] px-1.5 py-1 text-[#8a6a3a]">
               <span className="font-semibold">Markets:</span> {PLANET_GUIDES[popup.name]?.market}
             </p>
@@ -258,7 +303,7 @@ export function NorthIndianChart({
             </p>
           </div>
           <p className="mt-1.5 text-center text-[9px] uppercase tracking-widest text-[#b39a76]">
-            tap another glyph or outside to dismiss
+            tap another glyph, the empty chart or × to dismiss
           </p>
         </div>
       )}
@@ -272,6 +317,11 @@ export function NorthIndianChart({
         <p className="mt-0.5 text-center text-[10px] text-[#b39a76]">
           Lagna · {SIGNS[lagnaSignNumber]} — tap any planet glyph for its meaning
         </p>
+      )}
+      {showLegend && (
+        <div className="mt-1.5">
+          <KundliLegend />
+        </div>
       )}
     </div>
   );

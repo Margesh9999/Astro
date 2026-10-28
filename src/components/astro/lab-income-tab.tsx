@@ -47,7 +47,7 @@ export function LabIncomeTab() {
       const p = await labApi.incomePlan({ capital, target_weekly: target, focus });
       setPlan(p);
     } catch (e) {
-      setErr(String(e?.message ?? e));
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

@@ -15,6 +15,7 @@ import { OptionsLabCard } from './options-lab-card';
 import { JatakaCard } from './jataka-card';
 import { AgentsCard } from './agents-card';
 import { ConceptsCard } from './concepts-card';
+import { FinalStrategyCard } from './final-strategy-card';
 import { InstrumentPicker } from './instrument-picker';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -174,18 +175,14 @@ export function AstroDashboard() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4">
           <ModelLab symbol={symbol} vedic={VEDIC} />
-          <div className="lg:col-span-2">
-            <BacktestCard symbol={symbol} vedic={VEDIC} />
-          </div>
+          <BacktestCard symbol={symbol} vedic={VEDIC} />
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4">
+          <AstroSignalCard symbol={symbol} spot={quote?.price} />
           <EventsCard symbol={symbol} />
-          <div className="lg:col-span-2">
-            <AstroSignalCard symbol={symbol} spot={quote?.price} />
-          </div>
         </div>
 
         {/* ── Merged: Janma Kundli & Wealth Blueprint (configurable, default Margesh) ── */}
@@ -225,6 +222,17 @@ export function AstroDashboard() {
             <AgentsCard symbol={symbol} />
             <ConceptsCard />
           </div>
+        </section>
+
+        {/* ── Final Strategy: every signal → one plan (keep as the last section) ── */}
+        <section className="mt-8">
+          <div className="mb-3 flex items-center gap-3">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-[#97795a]">
+              ✦ Final Strategy &amp; Income Plan
+            </h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-[#e3cfa4] to-transparent" />
+          </div>
+          <FinalStrategyCard symbol={symbol} symbolName={quote?.name} />
         </section>
 
         {loadingCore && (
