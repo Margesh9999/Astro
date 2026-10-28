@@ -30,6 +30,37 @@ PERIOD_DAYS = {
     "1y": 380, "2y": 760, "5y": 1900, "10y": 3800, "ytd": 380, "max": 12000,
 }
 
+DEMO_DATA = os.environ.get("ASTRO_DEMO_DATA", "").lower() in ("1", "true", "yes")
+DEMO_START = {"^GSPC": "1927-12-30", "^DJI": "1950-01-03", "^IXIC": "1971-02-05", "^FTSE": "1984-01-03",
+              "^NSEI": "2007-09-17", "^BSESN": "1997-07-01"}
+
+
+def synthetic_history(symbol: str, period: str = "10y") -> pd.DataFrame:
+    """Deterministic GBM price history for offline development and CI (ASTRO_DEMO_DATA=1).
+
+    Never used unless the env flag is set, so live users always see real quotes.
+    """
+    seed = sum(ord(c) * (i + 1) for i, c in enumerate(symbol)) % (2 ** 32)
+    rng = np.random.default_rng(seed)
+    start = pd.Timestamp(DEMO_START.get(symbol, "1995-01-03"))
+    idx = pd.bdate_range(start, pd.Timestamp.today().normalize())
+    n = len(idx)
+    vol = 0.011 * np.exp(0.35 * np.sin(np.arange(n) / 600.0))
+    rets = 0.0003 + vol * rng.standard_t(5, n) / np.sqrt(5 / 3)
+    close = 100.0 * np.exp(np.cumsum(rets))
+    open_ = close * (1 + rng.normal(0, 0.002, n))
+    high = np.maximum(open_, close) * (1 + np.abs(rng.normal(0, 0.004, n)))
+    low = np.minimum(open_, close) * (1 - np.abs(rng.normal(0, 0.004, n)))
+    df = pd.DataFrame({"Open": open_, "High": high, "Low": low, "Close": close,
+                       "Volume": rng.integers(1_000_000, 5_000_000, n).astype(float)}, index=idx)
+    df.index.name = "Date"
+    if period != "max":
+        df = df.iloc[-min(n, int(PERIOD_DAYS.get(period, 3800) * 252 / 365) + 1):].copy()
+    df["Returns"] = df["Close"].pct_change()
+    df["Log_Returns"] = np.log(df["Close"] / df["Close"].shift(1))
+    return df
+
+
 class MarketDataService:
     """Service for fetching and processing market data"""
 
@@ -113,6 +144,8 @@ class MarketDataService:
             DataFrame with OHLCV data
         """
         key = f"{symbol}|{period}|{interval}"
+        if DEMO_DATA:
+            return synthetic_history(symbol, period)
         cached, stale = self._cache_get(key)
         if cached is not None and not stale:
             return cached
@@ -202,6 +235,8 @@ class MarketDataService:
         Returns:
             Current price or None if error
         """
+        if DEMO_DATA:
+            return float(synthetic_history(symbol, "1mo")["Close"].iloc[-1])
         try:
             ticker = yf.Ticker(symbol)
             data = ticker.history(period="1d", interval="1m")
@@ -238,6 +273,8 @@ class MarketDataService:
         if cached and (time.time() - cached[1]) < self.INFO_TTL:
             return cached[0]
         try:
+            if DEMO_DATA:
+                raise RuntimeError("demo data mode")
             ticker = yf.Ticker(symbol)
             info = ticker.info
             result = {

@@ -32,3 +32,7 @@ server.log
 .DS_Store
 coverage/
 .vercel
+
+# mini-service runtime
+mini-services/astro-backend/venv
+mini-services/astro-backend/data/

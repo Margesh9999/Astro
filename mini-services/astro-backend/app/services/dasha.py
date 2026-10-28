@@ -12,6 +12,12 @@ Rectified logic (this is the fix for "Antardasha doesn't seem correct"):
      any MD therefore sum EXACTLY to the MD length.
   5. Pratyantardashas follow the same rule one level deeper inside each AD.
   6. Year length = 365.2425 solar days (drikpanchang convention).
+  7. v1.3 fix — the birth mahadasha is NOT compressed into its balance. It is laid
+     out at full length from its virtual start (birth - elapsed portion), and every
+     antardasha / pratyantardasha that finished before birth is dropped; the one
+     running at birth is clipped to start at birth. This is how drikpanchang lists
+     the first mahadasha (e.g. a native born late in Sun MD starts mid-way, in a
+     later AD such as Rahu or Jupiter, not in Sun/Sun).
 """
 import swisseph as swe
 from datetime import datetime, timedelta
@@ -84,6 +90,7 @@ class VimshottariDasha:
         self.first_lord = NAKSHATRA_LORDS[self.nak_index]
         first_years = LORD_YEARS[self.first_lord]
         self.balance_years = first_years * (1.0 - frac)
+        self.elapsed_years = first_years * frac
         logger.info(
             f"Vimshottari: nakshatra idx {self.nak_index} lord {self.first_lord}, "
             f"balance {self.balance_years:.3f}y of {first_years}y"
@@ -105,10 +112,16 @@ class VimshottariDasha:
     def _build_tree(self) -> List[Dict]:
         cursor = self.birth
         tree = []
-        for md in self._md_start_lords():
+        for i, md in enumerate(self._md_start_lords()):
             md_len_days = md["years"] * YEAR_DAYS
             md_start, md_end = cursor, cursor + timedelta(days=md_len_days)
-            ads = self._antardashas(md["lord"], md["years"], md_start)
+            if i == 0:
+                # full-length layout from the virtual (pre-birth) start, clipped at birth
+                full_years = LORD_YEARS[md["lord"]]
+                virtual_start = self.birth - timedelta(days=self.elapsed_years * YEAR_DAYS)
+                ads = self._clip(self._antardashas(md["lord"], full_years, virtual_start), self.birth)
+            else:
+                ads = self._antardashas(md["lord"], md["years"], md_start)
             tree.append({
                 "lord": md["lord"],
                 "glyph": LORD_GLYPHS[md["lord"]],
@@ -140,6 +153,23 @@ class VimshottariDasha:
             })
             cursor = ad_end
         return ads
+
+    @staticmethod
+    def _clip(periods: List[Dict], birth: datetime) -> List[Dict]:
+        """Drop sub-periods that ended before birth; start the running one at birth."""
+        out = []
+        for p in periods:
+            if p["end"] <= birth:
+                continue
+            q = dict(p)
+            if q["start"] < birth:
+                q["start"] = birth
+                q["years"] = round((q["end"] - birth).days / YEAR_DAYS, 4)
+                q["balance_at_birth"] = True
+                if "pratyantardashas" in q:
+                    q["pratyantardashas"] = VimshottariDasha._clip(q["pratyantardashas"], birth)
+            out.append(q)
+        return out
 
     def _pratyantardashas(self, ad_lord: str, ad_years: float, ad_start: datetime) -> List[Dict]:
         start_idx = LORD_ORDER.index(ad_lord)
@@ -185,6 +215,12 @@ class VimshottariDasha:
                         "lord": ad["lord"], "glyph": ad["glyph"],
                         "start": _fmt(ad["start"]), "end": _fmt(ad["end"]),
                         "years": ad["years"],
+                        "balance_at_birth": ad.get("balance_at_birth", False),
+                        "pratyantardashas": [
+                            {"lord": p["lord"], "glyph": p["glyph"], "start": _fmt(p["start"]),
+                             "end": _fmt(p["end"]), "years": p["years"]}
+                            for p in ad["pratyantardashas"]
+                        ],
                     })
             out_mds.append({
                 "lord": md["lord"], "glyph": md["glyph"],
@@ -196,6 +232,8 @@ class VimshottariDasha:
             "pada": self.pada,
             "first_lord": self.first_lord,
             "balance_years": round(self.balance_years, 3),
+            "elapsed_years_at_birth": round(self.elapsed_years, 3),
+            "year_days": YEAR_DAYS,
             "mahadashas": out_mds,
         }
 
@@ -228,7 +266,7 @@ def demo_check():
             ok = False
             print(f"FAIL {md['lord']}: ads sum {s} != md {md['years']}")
         first_ad = md["antardashas"][0]["lord"]
-        if first_ad != md["lord"]:
+        if first_ad != md["lord"] and md is not v.tree[0]:
             ok = False
             print(f"FAIL {md['lord']}: first AD {first_ad} != MD lord")
         # exact date-chain check: last AD must end exactly at MD end

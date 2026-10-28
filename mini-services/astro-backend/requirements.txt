@@ -1,6 +1,7 @@
 fastapi>=0.141
 uvicorn[standard]>=0.52
 pydantic>=2.13
+pydantic-settings>=2.6
 pyswisseph==2.10.3.2
 pandas>=3.0
 numpy>=2.5
