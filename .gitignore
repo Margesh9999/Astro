@@ -36,3 +36,4 @@ coverage/
 # mini-service runtime
 mini-services/astro-backend/venv
 mini-services/astro-backend/data/
+tsconfig.tsbuildinfo
