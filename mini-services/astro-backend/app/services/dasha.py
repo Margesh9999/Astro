@@ -68,6 +68,44 @@ DASHA_INTERPRETATIONS = {
 }
 
 
+# One-line "what this period means for trading" per lord, at each dasha level.
+TRADING_LINES = {
+    "MD": {
+        "Sun": "Multi-year backdrop favours large-cap leaders, PSU/energy and gold; build core positions, avoid ego-sized bets.",
+        "Moon": "Multi-year backdrop tracks crowd liquidity — consumer/FMCG/pharma lead; automate rules so mood never sizes a trade.",
+        "Mars": "Multi-year backdrop rewards momentum in energy, metals, realty, defence; trade breakouts with hard stops.",
+        "Mercury": "Multi-year backdrop is ideal for systematic, data-driven trading in IT/telecom/media; build and refine models.",
+        "Jupiter": "Multi-year backdrop favours compounding in banks, insurers, quality growth; let winners run, add on dips.",
+        "Venus": "Multi-year backdrop favours finance, autos, luxury, consumer brands; steady accumulation beats churn.",
+        "Saturn": "Multi-year backdrop is slow and structural — infra, metals, value; DCA, low leverage, long holds.",
+        "Rahu": "Multi-year backdrop amplifies tech/foreign/speculative themes; one speculative sleeve, strict position caps.",
+        "Ketu": "Multi-year backdrop of detachment — simplify, cut losers fast, favour niche research and pharma.",
+    },
+    "AD": {
+        "Sun": "This sub-period (months–years) favours conviction trades in market leaders; size normally, keep stops honest.",
+        "Moon": "This sub-period follows sentiment and liquidity; trade with the crowd, never against a panic.",
+        "Mars": "This sub-period brings sharp swings; favour short swing trades, take profits quickly.",
+        "Mercury": "This sub-period rewards analysis and shorter-term trading; good time to test and tune strategies.",
+        "Jupiter": "This sub-period is expansionary; scale up quality positions gradually, best for investing.",
+        "Venus": "This sub-period is comfortable for steady accumulation and income strategies (covered calls, dividends).",
+        "Saturn": "This sub-period tests patience; reduce leverage, accumulate slowly, expect delays before payoff.",
+        "Rahu": "This sub-period brings sudden spikes; trade smaller, use hard stops, avoid FOMO entries.",
+        "Ketu": "This sub-period favours closing loose ends; trim, take profits, avoid opening many new positions.",
+    },
+    "PD": {
+        "Sun": "Next few weeks: decisive entries in leaders are favoured.",
+        "Moon": "Next few weeks: mood-driven moves — fade extremes, keep size modest.",
+        "Mars": "Next few weeks: volatile — quick trades, tight stops.",
+        "Mercury": "Next few weeks: good for research, rebalancing and calculated short-term trades.",
+        "Jupiter": "Next few weeks: supportive — add to quality on pullbacks.",
+        "Venus": "Next few weeks: steady — income and accumulation strategies work.",
+        "Saturn": "Next few weeks: slow — be patient, don't force trades.",
+        "Rahu": "Next few weeks: whipsaw risk — halve size on new ideas.",
+        "Ketu": "Next few weeks: detach — book profits, avoid new speculation.",
+    },
+}
+
+
 def _fmt(dt: datetime) -> str:
     return dt.strftime("%d-%m-%Y")
 
@@ -75,13 +113,15 @@ def _fmt(dt: datetime) -> str:
 class VimshottariDasha:
     """Compute the full Vimshottari dasha tree from the Moon's nakshatra at birth."""
 
-    def __init__(self, moon_sidereal_longitude: float, birth_utc: datetime):
+    def __init__(self, moon_sidereal_longitude: float, birth_utc: datetime,
+                 display_offset_hours: float = 0.0):
         """
         Args:
             moon_sidereal_longitude: Moon's sidereal longitude in degrees at birth.
             birth_utc: birth moment as an aware or naive UTC datetime.
         """
         self.birth = birth_utc if birth_utc.tzinfo is None else birth_utc.astimezone(tz=None).replace(tzinfo=None)
+        self.display_offset = timedelta(hours=display_offset_hours)
         lon = moon_sidereal_longitude % 360
         span = 360.0 / 27.0
         self.nak_index = int(lon / span) % 27
@@ -204,8 +244,13 @@ class VimshottariDasha:
         return {"mahadasha": None, "antardasha": None, "pratyantardasha": None, "when": when}
 
     # ------------------------------------------------------------------
+    def _d(self, dt: datetime) -> str:
+        """dd-mm-yyyy in the native's local (birth) time zone."""
+        return _fmt(dt + self.display_offset)
+
     def serialize(self, upto_ad: bool = True) -> Dict:
-        """JSON-safe tree (dates as dd-mm-yyyy strings)."""
+        """JSON-safe tree (dates as dd-mm-yyyy strings in local birth time)."""
+        _fmt = self._d  # noqa: N806 — shadow the module helper with the tz-aware one
         out_mds = []
         for md in self.tree:
             ads = []
@@ -218,7 +263,8 @@ class VimshottariDasha:
                         "balance_at_birth": ad.get("balance_at_birth", False),
                         "pratyantardashas": [
                             {"lord": p["lord"], "glyph": p["glyph"], "start": _fmt(p["start"]),
-                             "end": _fmt(p["end"]), "years": p["years"]}
+                             "end": _fmt(p["end"]), "years": p["years"],
+                             "balance_at_birth": p.get("balance_at_birth", False)}
                             for p in ad["pratyantardashas"]
                         ],
                     })
@@ -236,6 +282,18 @@ class VimshottariDasha:
             "year_days": YEAR_DAYS,
             "mahadashas": out_mds,
         }
+
+    def trading_now(self, when: Optional[datetime] = None) -> Dict:
+        """Current MD / AD / PD with dates and a one-line trading meaning for each level."""
+        cur = self.current(when)
+        out = {}
+        for key, lvl in (("mahadasha", "MD"), ("antardasha", "AD"), ("pratyantardasha", "PD")):
+            p = cur.get(key)
+            out[key] = None if not p else {
+                "lord": p["lord"], "start": self._d(p["start"]), "end": self._d(p["end"]),
+                "years": p["years"], "meaning": TRADING_LINES[lvl][p["lord"]],
+            }
+        return out
 
     def interpretation(self, when: Optional[datetime] = None) -> Dict:
         cur = self.current(when)

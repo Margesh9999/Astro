@@ -71,6 +71,9 @@ class SuriSignalEngine:
 
     def _sidereal_lon(self, jd: float, planet) -> float:
         lon, speed = self._tropical_lon(jd, planet)
+        # sid mode is process-global and other modules switch it (KP/Raman charts):
+        # pin Lahiri right before reading the ayanamsa so ingress dates stay stable
+        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
         ayan = swe.get_ayanamsa_ut(jd)
         return (lon - ayan) % 360.0, speed
 

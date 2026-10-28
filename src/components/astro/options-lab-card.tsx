@@ -100,7 +100,7 @@ function PricerTab({ spot, currency }: { spot: number; currency: string }) {
       const smileRes = await quantApi.sabrSmile({ forward: S, T, atm_vol: sigma, beta: 1, rho, nu });
       setSmile(smileRes);
     } catch (e) {
-      setErr(String(e?.message ?? e));
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

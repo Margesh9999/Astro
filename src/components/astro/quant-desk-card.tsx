@@ -11,6 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { quantApi, enhanceApi } from '@/lib/astro/api';
 import type { AnalyticsPack, QuantRiskResponse, QuantStatsResponse } from '@/lib/astro/types';
 import { Briefcase, ShieldAlert, Lightbulb, TrendingUp, TrendingDown, MoveRight } from 'lucide-react';
+import { QuantSignalsTab } from './quant-signals-tab';
+import { QuantHeatmapsTab } from './quant-heatmaps-tab';
+import { QuantRegimeTab } from './quant-regime-tab';
+import { QuantPortfolioTab } from './quant-portfolio-tab';
+import { QuantForecastBaselines } from './quant-forecast-baselines';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -22,17 +27,6 @@ function pct(n: number | null | undefined, d = 1) {
 function num(n: number | null | undefined, d = 2) {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
   return n.toFixed(d);
-}
-
-function heatStyle(v: number | null | undefined) {
-  if (v === null || v === undefined) return { background: '#faf4e4', color: '#b39a76' };
-  const x = Math.max(-0.12, Math.min(0.12, v));
-  if (x >= 0) {
-    const a = 0.12 + (x / 0.12) * 0.55;
-    return { background: `rgba(74,154,126,${a})`, color: '#22423a' };
-  }
-  const a = 0.12 + (-x / 0.12) * 0.55;
-  return { background: `rgba(207,91,84,${a})`, color: '#5c2620' };
 }
 
 function corrStyle(v: number | null | undefined) {
@@ -164,39 +158,6 @@ function SeasonBars({ pack }: { pack: AnalyticsPack }) {
           <Area type="monotone" dataKey="avg" stroke="#9b8ac4" strokeWidth={1.4} fill="rgba(155,138,196,0.12)" isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
-  );
-}
-
-function MonthlyHeatmap({ pack }: { pack: AnalyticsPack }) {
-  return (
-    <div className="warm-scroll overflow-x-auto">
-      <table className="w-full min-w-[520px] border-separate border-spacing-0.5 text-center text-[10px]">
-        <thead>
-          <tr>
-            <th className="text-[#b39a76]">Yr</th>
-            {MONTHS.map((m) => (
-              <th key={m} className="font-medium text-[#b39a76]">{m}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {pack.heatmap.years.map((y, yi) => (
-            <tr key={y}>
-              <td className="font-mono text-[#97795a]">{y}</td>
-              {pack.heatmap.values[yi].map((v, mi) => {
-                const style = heatStyle(v === null ? null : v / 100);
-                return (
-                  <td key={mi} className="rounded font-mono" style={{ ...style, padding: '2px 1px' }}
-                      title={v !== null ? `${MONTHS[mi]} ${y}: ${v.toFixed(2)}%` : ''}>
-                    {v !== null ? v.toFixed(0) : '·'}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -565,14 +526,21 @@ export function QuantDeskCard({ symbol }: { symbol: string }) {
           </div>
         ) : (
           <Tabs defaultValue="overview" className="mt-0">
-            <TabsList className="mb-3 flex-wrap bg-[#f4e8cf]">
-              <TabsTrigger value="overview" className="text-xs data-[state=active]:bg-[#fffdf6]">Overview</TabsTrigger>
-              <TabsTrigger value="charts" className="text-xs data-[state=active]:bg-[#fffdf6]">Trend Charts</TabsTrigger>
-              <TabsTrigger value="momentum" className="text-xs data-[state=active]:bg-[#fffdf6]">Momentum &amp; Vol</TabsTrigger>
-              <TabsTrigger value="memory" className="text-xs data-[state=active]:bg-[#fffdf6]">Volume &amp; Memory</TabsTrigger>
-              <TabsTrigger value="correlations" className="text-xs data-[state=active]:bg-[#fffdf6]">Correlations</TabsTrigger>
-              <TabsTrigger value="forecast" className="text-xs data-[state=active]:bg-[#fffdf6]">Forecast</TabsTrigger>
-              <TabsTrigger value="heatmap" className="text-xs data-[state=active]:bg-[#fffdf6]">Monthly Heatmap</TabsTrigger>
+            <TabsList className="mb-3 h-auto flex-wrap justify-start bg-[#f4e8cf]">
+              {[
+                ['overview', 'Overview'],
+                ['signals', 'Signals'],
+                ['charts', 'Trend Charts'],
+                ['momentum', 'Momentum & Vol'],
+                ['memory', 'Volume & Memory'],
+                ['regime', 'Risk & Regime'],
+                ['heatmap', 'Heatmaps'],
+                ['correlations', 'Correlations'],
+                ['portfolio', 'Portfolio'],
+                ['forecast', 'Forecast'],
+              ].map(([v, label]) => (
+                <TabsTrigger key={v} value={v} className="flex-none text-xs data-[state=active]:bg-[#fffdf6]">{label}</TabsTrigger>
+              ))}
             </TabsList>
 
             {/* ── Overview tab (original desk) ── */}
@@ -906,20 +874,23 @@ export function QuantDeskCard({ symbol }: { symbol: string }) {
               {!fc && pack && state?.packError && (
                 <p className="text-xs text-[#a14d3c]">Forecast unavailable — {state.packError}</p>
               )}
+              <QuantForecastBaselines symbol={symbol} />
             </TabsContent>
 
-            {/* ── Monthly heatmap tab ── */}
-            <TabsContent value="heatmap" className="mt-0 flex flex-col gap-3">
-              {!pack && <Skeleton className="h-40 w-full bg-[#efdfbc]" />}
-              {pack && (
-                <>
-                  <MonthlyHeatmap pack={pack} />
-                  <Interpretation text={pack.heatmap.interpretation} />
-                  <p className="text-[10px] text-[#b39a76]">
-                    Cells show % return per calendar month. Green = positive month, red = negative.
-                  </p>
-                </>
-              )}
+            {/* ── Heatmaps tab (v1.3: full-history monthly + seasonality, signal, correlation, distribution, vol) ── */}
+            <TabsContent value="heatmap" className="mt-0">
+              <QuantHeatmapsTab symbol={symbol} />
+            </TabsContent>
+
+            {/* ── v1.3 tabs ── */}
+            <TabsContent value="signals" className="mt-0">
+              <QuantSignalsTab symbol={symbol} />
+            </TabsContent>
+            <TabsContent value="regime" className="mt-0">
+              <QuantRegimeTab symbol={symbol} />
+            </TabsContent>
+            <TabsContent value="portfolio" className="mt-0">
+              <QuantPortfolioTab symbol={symbol} />
             </TabsContent>
           </Tabs>
         )}

@@ -204,86 +204,64 @@ async def get_feature_importance(symbol: str = "^GSPC"):
 
 
 @router.get("/planetary/{date}")
-async def get_planetary_positions(date: str, vedic: bool = False):
-    """Get planetary positions for a specific date (YYYY-MM-DD)"""
+async def get_planetary_positions(date: str, vedic: bool = False, lat: Optional[float] = None,
+                                  lon: Optional[float] = None, at: str = "",
+                                  place: str = "", node: str = "mean", ayanamsa: str = "lahiri"):
+    """Planetary positions for a date (YYYY-MM-DD).
+
+    v1.3 Vedic mode: the moment is ``at`` (``now`` → current UTC time, ``HH:MM`` → that UTC
+    time on ``date``); default is *now* when ``date`` is today, else 06:30 UT (noon IST).
+    The Lagna is cast for the observer ``lat``/``lon`` (default Ujjain, 23.1793 N 75.7849 E).
+    """
     try:
         target_date = datetime.strptime(date, "%Y-%m-%d")
         julian_day = swe.julday(target_date.year, target_date.month, target_date.day, 0.0)
+        observer = None
 
         if vedic:
-            positions = vedic_calculator.calculate_all_planets_vedic(julian_day)
-            # Add Rahu/Ketu (mean node) for the Vedic view
-            for node_name, node_id in (("Rahu", swe.MEAN_NODE),):
-                try:
-                    positions[node_name] = vedic_calculator.calculate_planet_position_vedic(node_id, julian_day)
-                    ketu_lon = (positions[node_name]["longitude"] + 180) % 360
-                    ketu = dict(positions[node_name])
-                    ketu["longitude"] = ketu_lon
-                    ketu["sign_number"] = int(ketu_lon // 30)
-                    ketu["degree_within_sign"] = ketu_lon % 30
-                    ketu["sign"] = vedic_calculator.calculate_planet_position_vedic(node_id, julian_day)["sign"]  # placeholder, fixed below
-                    nak = vedic_calculator.calculate_nakshatra(ketu_lon)
-                    ketu["nakshatra"] = nak["nakshatra"]
-                    ketu["nakshatra_index"] = nak["nakshatra_index"]
-                    ketu["pada"] = nak["pada"]
-                    ketu["is_retrograde"] = True
-                    positions["Ketu"] = ketu
-                    # fix sign name for Ketu
-                    signs = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-                             "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-                    positions["Ketu"]["sign"] = signs[ketu["sign_number"]]
-                except Exception as e:
-                    logger.warning(f"Could not compute nodes: {e}")
+            from app.core.vedic import sky_positions
+            utc_now = datetime.utcnow()
+            if at == "now" or (not at and target_date.date() == utc_now.date()):
+                moment = utc_now if target_date.date() == utc_now.date() else target_date.replace(hour=utc_now.hour, minute=utc_now.minute)
+            elif at and ":" in at:
+                hh, mm = (int(x) for x in at.split(":")[:2])
+                moment = target_date.replace(hour=hh, minute=mm)
+            else:
+                moment = target_date.replace(hour=6, minute=30)
+            julian_day = swe.julday(moment.year, moment.month, moment.day,
+                                    moment.hour + moment.minute / 60.0 + moment.second / 3600.0)
+            if (lat is None or lon is None) and place:
+                from app.services.jataka_geo import resolve_place
+                hit = resolve_place(place)
+                if hit:
+                    lat, lon, place = hit["lat"], hit["lon"], hit["name"]
+            o_lat = 23.1793 if lat is None else float(lat)
+            o_lon = 75.7849 if lon is None else float(lon)
+            sky = sky_positions(julian_day, ayanamsa if ayanamsa else "lahiri", node, o_lat, o_lon, outer=True)
+            positions = sky["positions"]
+            lagna_sign = positions["Lagna"]["sign_number"]
+            for gname, p in positions.items():
+                p["house"] = (p["sign_number"] - lagna_sign) % 12 + 1
+                dig, dig_score = _dignity(gname, p["sign_number"], p["degree_within_sign"])
+                p["dignity"] = dig
+                p["dignity_score"] = _f(dig_score)
+            observer = {"lat": o_lat, "lon": o_lon,
+                        "place": place or ("Ujjain, Madhya Pradesh, India (traditional meridian)" if lat is None else f"{o_lat:.2f}, {o_lon:.2f}"),
+                        "utc": moment.strftime("%Y-%m-%dT%H:%M:%SZ"), "node": node,
+                        "ayanamsa": sky["ayanamsa_label"]}
         else:
             positions = predictor_service.ephemeris.calculate_all_planets(julian_day)
-
-        # Vedic mode: add the Ascendant (Lagna) for the day so the frontend can
-        # draw a proper North Indian kundali. Reference: local noon IST over
-        # Ujjain (23.1793 N, 75.7849 E) — the traditional zero-meridian of
-        # Hindu astronomy (the "Lanka line").
-        if vedic:
-            try:
-                signs_list = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-                              "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-                swe.set_sid_mode(swe.SIDM_LAHIRI)
-                # 12:00 IST = 06:30 UT
-                jd_noon = swe.julday(target_date.year, target_date.month, target_date.day, 6.5)
-                cusps, ascmc = swe.houses_ex(
-                    jd_noon, 23.1793, 75.7849, b'W', flags=swe.FLG_SIDEREAL
-                )
-                asc_lon = ascmc[0] % 360
-                asc_nak = vedic_calculator.calculate_nakshatra(asc_lon)
-                positions["Lagna"] = {
-                    "longitude": asc_lon,
-                    "sign": signs_list[int(asc_lon // 30)],
-                    "sign_number": int(asc_lon // 30),
-                    "degree_within_sign": asc_lon % 30,
-                    "is_retrograde": False,
-                    "nakshatra": asc_nak["nakshatra"],
-                    "nakshatra_index": asc_nak["nakshatra_index"],
-                    "pada": asc_nak["pada"],
-                }
-                # Whole-sign houses counted from the Lagna sign
-                lagna_sign = int(asc_lon // 30)
-                for gname, p in positions.items():
-                    sign_num = p.get("sign_number", int(p["longitude"] // 30))
-                    p["house"] = (sign_num - lagna_sign) % 12 + 1
-                    deg = p.get("degree_within_sign", p["longitude"] % 30)
-                    dig, dig_score = _dignity(gname, sign_num, deg)
-                    p["dignity"] = dig
-                    p["dignity_score"] = _f(dig_score)
-            except Exception as e:
-                logger.warning(f"Could not compute day ascendant: {e}")
 
         aspects = predictor_service.aspects_calculator.calculate_all_aspects(positions)
 
         return {
             "date": date,
             "julian_day": julian_day,
-            "ayanamsa": vedic_calculator.get_ayanamsa(julian_day) if vedic else None,
+            "ayanamsa": (sky["ayanamsa"] if vedic else None),
             "vedic": vedic,
             "planetary_positions": positions,
-            "aspects": aspects
+            "aspects": aspects,
+            "observer": observer,
         }
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
@@ -529,16 +507,22 @@ async def get_astro_events(days: int = 30):
         for d in range(days + 1):
             day = today + timedelta(days=d)
             jd = swe.julday(day.year, day.month, day.day, 0.0)
+            # samples are at 00:00 UTC, so anything detected between the previous sample
+            # and this one happened on the previous UTC calendar day
+            event_day = day - timedelta(days=1)
             pos: Dict[str, float] = {}
             for name, pid in planet_ids.items():
-                lon = swe.calc_ut(jd, pid)[0][0]
+                # sidereal (Lahiri) — the docstring promised sidereal ingresses but the
+                # call was tropical, putting e.g. Sun's ingress ~24 days late
+                swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+                lon = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SIDEREAL)[0][0]
                 pos[name] = lon
                 if prev_pos is not None and name in prev_pos:
                     old_sign = int(prev_pos[name] // 30)
                     new_sign = int(lon // 30)
                     if old_sign != new_sign:
                         events.append({
-                            "date": day.strftime("%Y-%m-%d"),
+                            "date": event_day.strftime("%Y-%m-%d"),
                             "event": f"{name} enters {signs[new_sign]}",
                             "type": "ingress",
                             "planets": [name],
@@ -564,17 +548,21 @@ async def get_astro_events(days: int = 30):
                                 # crossing between pair_cont_prev and cont
                                 prev_cont = cont - minimal_step(raw_prev, raw_now)
                                 if (prev_cont - target) * (cont - target) < 0:
-                                    if p1 == "Sun" and p2 == "Moon":
+                                    if p1 == "Sun" and p2 == "Moon" and angle in (0.0, 180.0):
+                                        # only the conjunction / opposition are lunations; the old code
+                                        # labelled every Sun-Moon aspect (square, trine…) a "Full Moon"
                                         if angle == 0.0:
                                             ev, sig, desc = "New Moon", "High", "Sun-Moon conjunction — lunar reset, new beginnings."
                                         else:
                                             ev, sig, desc = "Full Moon", "High", "Sun-Moon opposition — culmination and release."
+                                    elif p1 == "Sun" and p2 == "Moon":
+                                        continue
                                     else:
                                         ev, sig, desc = f"{p1} {label} {p2}", (
                                             "High" if angle in (0.0, 120.0, 180.0) else "Medium"
                                         ), f"Exact {label.lower()} between {p1} and {p2} ({int(angle)}°)."
                                     events.append({
-                                        "date": day.strftime("%Y-%m-%d"),
+                                        "date": event_day.strftime("%Y-%m-%d"),
                                         "event": ev,
                                         "type": "lunar_phase" if p1 == "Sun" and p2 == "Moon" else label.lower(),
                                         "planets": [p1, p2],
@@ -603,77 +591,21 @@ async def get_astro_events(days: int = 30):
 @router.get("/natal")
 async def get_natal_chart():
     """
-    Vedic (sidereal, Lahiri) birth chart for the native:
-    born 23 April 1994, 06:45 IST (01:15 UTC), Vallabh Vidyanagar, Gujarat, India
-    (22.5347 N, 73.13 E). Returns the nine grahas + Lagna with nakshatra/pada.
+    Vedic (sidereal, Lahiri, mean node) birth chart for the default native
+    (Margesh — 23 Apr 1994, 06:45 IST, Vallabh Vidyanagar 22.5347 N 73.13 E),
+    computed by the same jataka engine as /jataka/report (IANA tz, FLG_SIDEREAL).
     """
     try:
-        # 06:45 IST = 01:15 UTC
-        jd = swe.julday(1994, 4, 23, 1.25)
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ayanamsa = swe.get_ayanamsa_ut(jd)
-
-        grahas = {
-            "Sun": swe.SUN, "Moon": swe.MOON, "Mercury": swe.MERCURY, "Venus": swe.VENUS,
-            "Mars": swe.MARS, "Jupiter": swe.JUPITER, "Saturn": swe.SATURN,
-            "Rahu": swe.MEAN_NODE,
-        }
-        signs = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-                 "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-
-        positions = {}
-        for name, pid in grahas.items():
-            data = vedic_calculator.calculate_planet_position_vedic(pid, jd)
-            if name == "Rahu":
-                positions[name] = data
-                # Ketu is always 180° opposite Rahu
-                ketu_lon = (data["longitude"] + 180) % 360
-                nak = vedic_calculator.calculate_nakshatra(ketu_lon)
-                positions["Ketu"] = {
-                    "longitude": ketu_lon,
-                    "sign": signs[int(ketu_lon // 30)],
-                    "sign_number": int(ketu_lon // 30),
-                    "degree_within_sign": ketu_lon % 30,
-                    "is_retrograde": True,
-                    "nakshatra": nak["nakshatra"],
-                    "nakshatra_index": nak["nakshatra_index"],
-                    "pada": nak["pada"],
-                }
-            else:
-                positions[name] = data
-
-        # Ascendant (sidereal) — Vallabh Vidyanagar
-        cusps, ascmc = swe.houses_ex(jd, 22.5347, 73.13, b'W', flags=swe.FLG_SIDEREAL)
-        asc_lon = ascmc[0] % 360
-        asc_nak = vedic_calculator.calculate_nakshatra(asc_lon)
-        positions["Lagna"] = {
-            "longitude": asc_lon,
-            "sign": signs[int(asc_lon // 30)],
-            "sign_number": int(asc_lon // 30),
-            "degree_within_sign": asc_lon % 30,
-            "is_retrograde": False,
-            "nakshatra": asc_nak["nakshatra"],
-            "nakshatra_index": asc_nak["nakshatra_index"],
-            "pada": asc_nak["pada"],
-        }
-
-        # Whole-sign house: count from Lagna sign
-        lagna_sign = int(asc_lon // 30)
-        for gname, p in positions.items():
-            sign_num = p.get("sign_number", int(p["longitude"] // 30))
-            p["house"] = (sign_num - lagna_sign) % 12 + 1
-            deg = p.get("degree_within_sign", p["longitude"] % 30)
-            dig, dig_score = _dignity(gname, sign_num, deg)
-            p["dignity"] = dig
-            p["dignity_score"] = _f(dig_score)
-
+        from app.services.jataka import JatakaEngine as _JE
+        ch = _JE().compute_chart()
+        b = ch["birth"]
         return {
             "success": True,
-            "native": "Margesh",
-            "birth": "1994-04-23 06:45 IST, Vallabh Vidyanagar, Gujarat, India",
-            "ayanamsa": ayanamsa,
-            "ayanamsa_mode": "Lahiri (Chitrapaksha)",
-            "positions": positions,
+            "native": b["name"],
+            "birth": f"{b['date']} {b['time']} ({b['tz_name']}, UTC{b['tz']:+.1f}), {b['place']}",
+            "ayanamsa": ch["ayanamsa"],
+            "ayanamsa_mode": ch["ayanamsa_mode"],
+            "positions": ch["positions"],
         }
     except Exception as e:
         logger.error(f"Error computing natal chart: {e}")
@@ -1075,7 +1007,10 @@ async def jataka_places(q: str = ""):
 @router.get("/jataka/report")
 async def jataka_report(symbol: str = "^GSPC", name: str = "", date: str = "",
                         time: str = "", place: str = "", capital: float = 50000.0,
-                        target_weekly: float = 500.0):
+                        target_weekly: float = 500.0, lat: Optional[float] = None,
+                        lon: Optional[float] = None, tz: Optional[float] = None,
+                        tz_name: str = "", node: str = "mean", ayanamsa: str = "lahiri",
+                        monthly_savings: float = 500.0, base_return: float = 0.08):
     """
     Full Jataka pack (T4 + T12 + T13): configurable natal chart, corrected
     Vimshottari dasha tree, strengths, market/sector/strategy recommendations,
@@ -1087,8 +1022,11 @@ async def jataka_report(symbol: str = "^GSPC", name: str = "", date: str = "",
         symbol_name = sym_info.get("name", symbol) if isinstance(sym_info, dict) else symbol
         report = jataka_engine.full_report(
             symbol=symbol, symbol_name=symbol_name, capital=capital,
-            target_weekly=target_weekly, name=name, date=date, time=time, place=place)
-        return report
+            target_weekly=target_weekly, name=name, date=date, time=time, place=place,
+            lat=lat, lon=lon, tz=tz, tz_name=tz_name, node=node, ayanamsa=ayanamsa,
+            monthly_savings=monthly_savings, base_return=base_return)
+        from app.api.routes_jataka import _clean  # v1.3: NaN/Inf-safe JSON
+        return _clean(report)
     except HTTPException:
         raise
     except Exception as e:
@@ -1336,11 +1274,11 @@ async def get_suri_cycles(symbol: str):
                  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
         for name, pid in planet_ids.items():
             try:
-                lon0 = suri_engine._sidereal_lon(jd0, pid)
+                lon0 = suri_engine._sidereal_lon(jd0, pid)[0]
                 sign0 = int(lon0 // 30)
                 crossed = False
                 for i in range(1, 61):
-                    lon = suri_engine._sidereal_lon(jd0 + i, pid)
+                    lon = suri_engine._sidereal_lon(jd0 + i, pid)[0]
                     if int(lon // 30) != sign0:
                         ingresses.append({"date": (today + timedelta(days=i)).isoformat(),
                                           "planet": name, "into": signs[int(lon // 30)]})
@@ -1407,25 +1345,13 @@ async def get_suri_cycles(symbol: str):
 # --- T11: TradingAgents-style multi-agent analysis ---------------------------
 
 @router.get("/agents/{symbol}")
-async def get_agents_analysis(symbol: str):
-    """T11: seven specialist agents debate the selected symbol; a fund manager
-    gives the final plain-English verdict."""
+async def get_agents_analysis(symbol: str, rounds: int = 2, capital: float = 50000.0, llm: bool = False):
+    """v1.3: TradingAgents-style pipeline — analyst team, bull/bear researcher
+    debate (N rounds) + research manager, trader plan, risk team and the
+    portfolio manager's final rating. Implementation lives in routes_strategy."""
     try:
-        stats_raw = await get_quant_stats(symbol, 3)
-        risk_raw = await get_quant_risk(symbol, 3)
-        astro = await get_astro_signal(symbol)
-        _, rets_1y = _load_returns(symbol, 1)
-        perf_1y = float((1.0 + pd.Series(rets_1y)).prod() - 1.0) * 100 if len(rets_1y) else 0.0
-        sym_info = market_service.get_symbol_info(symbol)
-        symbol_name = sym_info.get("name", symbol) if isinstance(sym_info, dict) else symbol
-        result = agents_engine.analyse(symbol, symbol_name,
-                                       stats={"performance": {"1y": perf_1y},
-                                              "risk": {
-                                                  "max_drawdown_pct": float(stats_raw.get("stats", {}).get("max_drawdown", -0.15) or 0.0) * 100,
-                                                  "var_95": float(risk_raw.get("risk", {}).get("var_hist_usd", 0) or 0),
-                                              }},
-                                       astro=astro, events=[])
-        return result
+        from app.api.routes_strategy import build_agents  # lazy: avoids circular import
+        return await build_agents(symbol, rounds=rounds, capital=capital, llm=llm)
     except HTTPException:
         raise
     except Exception as e:

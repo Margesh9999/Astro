@@ -2,7 +2,8 @@
 Vedic astrology calculations
 """
 import swisseph as swe
-from typing import Dict, List, Tuple
+from contextlib import contextmanager
+from typing import Dict, List, Optional, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -214,3 +215,105 @@ class VedicCalculator:
                 logger.warning(f"Could not calculate Vedic position for {name}: {e}")
 
         return results
+
+# ---------------------------------------------------------------------------
+# v1.3 — one correct, configurable sidereal pipeline used by the jataka engine,
+# /natal and /planetary. Positions come straight from swe.calc_ut with
+# FLG_SIDEREAL | FLG_SPEED (no manual "tropical − ayanamsa" subtraction), and the
+# Lagna from swe.houses_ex with the same sidereal flag + mode.
+# ---------------------------------------------------------------------------
+SIGN_NAMES = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+              "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+
+AYANAMSA_MODES = {
+    "lahiri": (swe.SIDM_LAHIRI, "Lahiri (Chitrapaksha)"),
+    "raman": (swe.SIDM_RAMAN, "B.V. Raman"),
+    "kp": (swe.SIDM_KRISHNAMURTI, "Krishnamurti (KP)"),
+    "tropical": (None, "Tropical (Western, no ayanamsa)"),
+}
+NODE_TYPES = {"mean": swe.MEAN_NODE, "true": swe.TRUE_NODE}
+GRAHA_IDS = {"Sun": swe.SUN, "Moon": swe.MOON, "Mercury": swe.MERCURY, "Venus": swe.VENUS,
+             "Mars": swe.MARS, "Jupiter": swe.JUPITER, "Saturn": swe.SATURN}
+# classical combustion orbs (degrees from the Sun); Mercury/Venus tighter when retrograde
+COMBUST_ORBS = {"Mars": 17, "Mercury": 14, "Venus": 10, "Jupiter": 11, "Saturn": 15}
+COMBUST_ORBS_RETRO = {"Mercury": 12, "Venus": 8}
+
+_NAK_W = 360.0 / 27.0
+
+
+@contextmanager
+def sidereal_mode(mode: Optional[int]):
+    """Temporarily set the process-global swisseph sidereal mode; ALWAYS restores Lahiri.
+
+    ``swe.set_sid_mode`` is global state shared by every module in the process, so any
+    non-default ayanamsa must be scoped — otherwise later calls silently shift by the
+    ayanamsa difference (days of error on ingress dates)."""
+    try:
+        if mode is not None:
+            swe.set_sid_mode(mode, 0, 0)
+        yield
+    finally:
+        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+
+
+def _nak(lon: float) -> Dict:
+    lon %= 360.0
+    i = int(lon / _NAK_W) % 27
+    frac = (lon % _NAK_W) / _NAK_W
+    return {"nakshatra": VedicCalculator.NAKSHATRAS[i], "nakshatra_index": i,
+            "pada": int(frac * 4) + 1, "position_in_nakshatra": frac}
+
+
+def _row(lon: float, speed: float, lat: float = 0.0) -> Dict:
+    lon %= 360.0
+    sn = int(lon // 30)
+    return {"longitude": lon, "sign": SIGN_NAMES[sn], "sign_number": sn,
+            "degree_within_sign": lon % 30, "speed_longitude": speed, "latitude": lat,
+            "is_retrograde": speed < 0, **_nak(lon)}
+
+
+def sky_positions(jd_ut: float, ayanamsa: str = "lahiri", node: str = "mean",
+                  lat: Optional[float] = None, lon: Optional[float] = None,
+                  outer: bool = False) -> Dict:
+    """Sidereal (or tropical) positions of the nine grahas (+ optional outer planets)
+    and — when an observer lat/lon is given — the Lagna, at ``jd_ut``.
+
+    Returns {"positions": {...}, "ayanamsa": deg, "ayanamsa_label": str, "flags": int}.
+    """
+    mode, label = AYANAMSA_MODES.get(ayanamsa, AYANAMSA_MODES["lahiri"])
+    with sidereal_mode(mode):
+        flags = swe.FLG_SWIEPH | swe.FLG_SPEED
+        if mode is not None:
+            flags |= swe.FLG_SIDEREAL
+            ayan = swe.get_ayanamsa_ut(jd_ut)
+        else:
+            ayan = 0.0
+        ids = dict(GRAHA_IDS)
+        if outer:
+            ids.update({"Uranus": swe.URANUS, "Neptune": swe.NEPTUNE, "Pluto": swe.PLUTO})
+        out: Dict[str, Dict] = {}
+        for name, pid in ids.items():
+            r = swe.calc_ut(jd_ut, pid, flags)[0]
+            out[name] = _row(r[0], r[3], r[1])
+        r = swe.calc_ut(jd_ut, NODE_TYPES.get(node, swe.MEAN_NODE), flags)[0]
+        out["Rahu"] = _row(r[0], r[3])
+        out["Ketu"] = _row(r[0] + 180.0, r[3])
+        # nodes are always shown retrograde in Jyotish (mean node strictly is)
+        out["Rahu"]["is_retrograde"] = out["Ketu"]["is_retrograde"] = True
+        if lat is not None and lon is not None:
+            hflags = swe.FLG_SIDEREAL if mode is not None else 0
+            _cusps, ascmc = swe.houses_ex(jd_ut, float(lat), float(lon), b"W", hflags)
+            asc = _row(ascmc[0], 0.0)
+            asc["is_retrograde"] = False
+            out["Lagna"] = asc
+        # combustion (asta) — within the classical orb of the Sun
+        sun = out["Sun"]["longitude"]
+        for name, orb in COMBUST_ORBS.items():
+            if name not in out:
+                continue
+            if out[name]["is_retrograde"] and name in COMBUST_ORBS_RETRO:
+                orb = COMBUST_ORBS_RETRO[name]
+            sep = abs((out[name]["longitude"] - sun + 180.0) % 360.0 - 180.0)
+            out[name]["combust"] = bool(sep <= orb)
+            out[name]["sun_separation"] = round(sep, 2)
+    return {"positions": out, "ayanamsa": ayan, "ayanamsa_label": label, "flags": flags}

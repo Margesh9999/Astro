@@ -14,3 +14,9 @@ python-dateutil>=2.9
 httpx>=0.28
 python-dotenv>=1.2
 beautifulsoup4>=4.15
+statsmodels>=0.14
+# v1.3 Model Lab (all optional at runtime: missing ones show as "skipped")
+xgboost-cpu>=3.0
+lightgbm>=4.5
+catboost>=1.2
+joblib>=1.4

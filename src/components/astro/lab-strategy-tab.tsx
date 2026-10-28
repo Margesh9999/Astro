@@ -82,7 +82,7 @@ export function LabStrategyTab({ symbol, exp }: { symbol: string; exp: OptionExp
       });
       setRes(r);
     } catch (e) {
-      setErr(String(e?.message ?? e));
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
