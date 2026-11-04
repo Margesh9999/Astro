@@ -27,3 +27,11 @@ settings = Settings()
 # Serverless hosts (Vercel, AWS Lambda) only allow writes under /tmp
 if (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and "ASTRO_CACHE_DIR" not in os.environ:
     settings.ASTRO_CACHE_DIR = "/tmp/astro-data"
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    # libraries that cache under $HOME (yfinance tz cache, matplotlib, …) need a writable home
+    os.environ.setdefault("XDG_CACHE_HOME", "/tmp/.cache")
+    try:
+        import yfinance as _yf
+        _yf.set_tz_cache_location("/tmp/.cache/py-yfinance")
+    except Exception:
+        pass

@@ -18,7 +18,8 @@ jobs:
       - name: API
         run: |
           set -x
-          sleep 90  # let a just-pushed preview/production build settle
+          sleep 150  # let a just-pushed production build settle
+          curl -sS -m 120 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/health" || true
           curl -sS -m 120 --retry 3 --retry-delay 15 --retry-all-errors -f "$API/api/v1/health"
           curl -sS -m 120 --retry 2 -f "$API/api/v1/panchang" | head -c 1500; echo
           curl -sS -m 120 --retry 2 -f "$API/api/v1/panchang/calendar?days=7" | head -c 400; echo
