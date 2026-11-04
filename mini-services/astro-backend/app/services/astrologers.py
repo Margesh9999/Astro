@@ -396,7 +396,12 @@ def _reddit_search(query: str, limit: int = 10) -> List[Dict]:
     import json
     from urllib.parse import quote_plus
 
-    txt = _get(f"https://www.reddit.com/search.json?q={quote_plus(query)}&sort=new&t=month&limit={limit}")
+    q = quote_plus(query)
+    try:
+        txt = _get(f"https://www.reddit.com/search.json?q={q}&sort=new&t=month&limit={limit}")
+    except Exception:
+        # the JSON API often refuses cloud IPs; the Atom feed is served more leniently
+        return _reddit_rss(f"https://www.reddit.com/search.rss?q={q}&sort=new&t=month&limit={limit}")
     out = []
     for ch in json.loads(txt).get("data", {}).get("children", []):
         d = ch.get("data", {})
@@ -405,6 +410,27 @@ def _reddit_search(query: str, limit: int = 10) -> List[Dict]:
                     "published": datetime.fromtimestamp(d.get("created_utc", 0), timezone.utc).isoformat(),
                     "url": f"https://www.reddit.com{d.get('permalink', '')}",
                     "description": (d.get("selftext") or "")[:600], "platform": "Reddit"})
+    return out
+
+
+def _reddit_rss(url: str) -> List[Dict]:
+    import html as _html
+    import re as _re
+    import xml.etree.ElementTree as ET
+
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    root = ET.fromstring(_get(url))
+    out = []
+    for e in root.findall("a:entry", ns):
+        link = e.find("a:link", ns)
+        href = link.get("href", "") if link is not None else ""
+        cat = e.find("a:category", ns)
+        sub = cat.get("term", "") if cat is not None else ""
+        body = _re.sub(r"<[^>]+>", " ", _html.unescape(e.findtext("a:content", "", ns)))
+        out.append({"video_id": e.findtext("a:id", "", ns), "title": e.findtext("a:title", "", ns),
+                    "channel": f"r/{sub}", "channel_url": f"https://www.reddit.com/r/{sub}",
+                    "published": e.findtext("a:updated", "", ns) or e.findtext("a:published", "", ns),
+                    "url": href, "description": " ".join(body.split())[:600], "platform": "Reddit"})
     return out
 
 

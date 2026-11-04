@@ -112,3 +112,21 @@ def test_insights_and_discover(monkeypatch):
     assert j["success"] and {i["platform"] for i in j["items"]} == {"YouTube", "Reddit"}
     yt = next(i for i in j["items"] if i["platform"] == "YouTube")
     assert yt["direction"] == "bullish" and yt["channel_url"].endswith("/@someastro")
+
+
+def test_reddit_rss_fallback(monkeypatch):
+    atom = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry>
+      <id>t3_abc</id><title>Saturn transit and Nifty crash next week?</title>
+      <link href="https://www.reddit.com/r/IndianStockMarket/comments/abc/x/"/>
+      <category term="IndianStockMarket"/><updated>2026-11-01T10:00:00+00:00</updated>
+      <content type="html">&lt;p&gt;Astrologer says bearish&lt;/p&gt;</content></entry></feed>"""
+
+    def fake_get(url, timeout=12.0):
+        if url.endswith(".rss") or "search.rss" in url:
+            return atom
+        raise RuntimeError("403")
+
+    monkeypatch.setattr(A, "_get", fake_get)
+    out = A._reddit_search("astrology stock market")
+    assert len(out) == 1 and out[0]["channel"] == "r/IndianStockMarket"
+    assert out[0]["url"].startswith("https://www.reddit.com/r/") and "bearish" in out[0]["description"]
