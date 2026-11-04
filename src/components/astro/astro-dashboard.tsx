@@ -17,6 +17,7 @@ import { AgentsCard } from './agents-card';
 import { ConceptsCard } from './concepts-card';
 import { FinalStrategyCard } from './final-strategy-card';
 import { InstrumentPicker } from './instrument-picker';
+import { PanchangCard } from './panchang-card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -163,8 +164,8 @@ export function AstroDashboard() {
       <main className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {backendOk === false && (
           <div className="mb-6 rounded-lg border border-[#eecfc7] bg-[#fbeae4] px-4 py-3 text-sm text-[#a14d3c]">
-            Backend service is not responding. It boots automatically with the app — try refreshing in a
-            few seconds.
+            Backend service is not responding. Locally it boots automatically with the app; on a hosted
+            deployment it may be waking from a cold start. Try refreshing in a few seconds.
           </div>
         )}
 
@@ -173,6 +174,10 @@ export function AstroDashboard() {
           <div className="lg:col-span-2">
             <PlanetaryCard data={planetary} loading={loadingCore} vedic={VEDIC} />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <PanchangCard symbol={symbol} />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4">

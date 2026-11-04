@@ -5,7 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * GET /api/astro/<path>?<query>  ->  http://127.0.0.1:8000/api/v1/<path>?<query>
  * POST works the same way with a JSON body.
  */
-const BACKEND = 'http://127.0.0.1:8000/api/v1';
+// ASTRO_BACKEND_URL lets a hosted deployment (Vercel, Docker, Render…) point at a
+// separately hosted FastAPI service, e.g. https://astrotrader-api.vercel.app
+const BACKEND = `${(process.env.ASTRO_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')}/api/v1`;
+export const maxDuration = 300; // model training / backtests on serverless hosts
 
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
@@ -33,6 +36,9 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
       headers: {
         'Content-Type': res.headers.get('content-type') ?? 'application/json',
         'Cache-Control': 'no-store',
+        ...(res.headers.get('content-disposition')
+          ? { 'Content-Disposition': res.headers.get('content-disposition') as string }
+          : {}),
       },
     });
   } catch (e) {

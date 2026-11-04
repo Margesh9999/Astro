@@ -1,0 +1,8 @@
+# Optional gradient-boosting models for the v1.3 Model Lab.
+# Missing ones show as "skipped" in the zoo, so serverless hosts (Vercel) can omit them
+# to stay under the function bundle limit.  Install with:  pip install -r requirements-ml.txt
+-r requirements.txt
+xgboost-cpu>=3.0
+lightgbm>=4.5
+catboost>=1.2
+joblib>=1.4

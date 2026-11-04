@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -21,3 +23,7 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 settings = Settings()
+
+# Serverless hosts (Vercel, AWS Lambda) only allow writes under /tmp
+if (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and "ASTRO_CACHE_DIR" not in os.environ:
+    settings.ASTRO_CACHE_DIR = "/tmp/astro-data"
