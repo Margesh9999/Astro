@@ -26,8 +26,27 @@ import swisseph as swe
 
 from app.core.vedic import VedicCalculator
 
+_TROP = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NONUT  # sidereal positions are nutation-free
+
+# swisseph's sidereal mode is process-global and other modules switch it (KP / Raman jataka
+# requests) from other threads, so FLG_SIDEREAL results can silently shift by ~1 deg. Panchang
+# therefore uses tropical longitudes minus a Lahiri ayanamsa table built once at import.
 swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
-_SID = swe.FLG_SWIEPH | swe.FLG_SIDEREAL | swe.FLG_SPEED
+_AY_JD0, _AY_STEP = swe.julday(1800, 1, 1, 0.0), 30.0
+_AY = [swe.get_ayanamsa_ut(_AY_JD0 + i * _AY_STEP) for i in range(int(400 * 365.25 / _AY_STEP) + 2)]
+
+
+def lahiri(jd: float) -> float:
+    x = (jd - _AY_JD0) / _AY_STEP
+    i = max(0, min(int(x), len(_AY) - 2))
+    f = x - i
+    return _AY[i] + (_AY[i + 1] - _AY[i]) * f
+
+
+def _calc(jd: float, pid: int) -> Tuple[float, float]:
+    """(sidereal Lahiri longitude, speed deg/day) independent of the global sidereal mode."""
+    r = swe.calc_ut(jd, pid, _TROP)[0]
+    return (r[0] - lahiri(jd)) % 360.0, r[3]
 
 NAKSHATRAS = VedicCalculator.NAKSHATRAS
 NAK_W = 360.0 / 27.0
@@ -83,9 +102,7 @@ def _dt(jd: float, tz_hours: float) -> datetime:
 
 
 def _sun_moon(jd: float) -> Tuple[float, float]:
-    s = swe.calc_ut(jd, swe.SUN, _SID)[0][0]
-    m = swe.calc_ut(jd, swe.MOON, _SID)[0][0]
-    return s % 360.0, m % 360.0
+    return _calc(jd, swe.SUN)[0], _calc(jd, swe.MOON)[0]
 
 
 def _elong(jd: float) -> float:
@@ -289,18 +306,18 @@ def _events_between(jd_a: float, jd_b: float, tz: float) -> List[Dict]:
              "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
     step = 0.25
     for name, pid in bodies.items():
-        prev = swe.calc_ut(jd_a, pid, _SID)[0]
+        prev = _calc(jd_a, pid)
         jd = jd_a + step
         while jd <= jd_b:
-            cur = swe.calc_ut(jd, pid, _SID)[0]
+            cur = _calc(jd, pid)
             if int(prev[0] // 30) != int(cur[0] // 30):
-                out.append({"jd": _refine(lambda j: int(swe.calc_ut(j, pid, _SID)[0][0] // 30), jd - step, jd), "kind": "ingress", "body": name,
+                out.append({"jd": _refine(lambda j: int(_calc(j, pid)[0] // 30), jd - step, jd), "kind": "ingress", "body": name,
                             "title": f"{name} enters {signs[int(cur[0] // 30)]}",
                             "meaning": f"{name}'s themes shift to a new sign; sector rotation narratives "
                                        f"often change around ingresses (folklore)."})
-            if name != "Sun" and (prev[3] > 0) != (cur[3] > 0):
-                retro = cur[3] < 0
-                out.append({"jd": _refine(lambda j: swe.calc_ut(j, pid, _SID)[0][3] > 0, jd - step, jd),
+            if name != "Sun" and (prev[1] > 0) != (cur[1] > 0):
+                retro = cur[1] < 0
+                out.append({"jd": _refine(lambda j: _calc(j, pid)[1] > 0, jd - step, jd),
                             "kind": "station", "body": name,
                             "title": f"{name} stations {'retrograde' if retro else 'direct'}",
                             "meaning": ("Stations are when a planet appears to stand still; traders "

@@ -50,3 +50,16 @@ def test_endpoints():
     r = client.get("/api/v1/panchang/calendar.ics", params={"start": "2026-11-04", "days": 7})
     assert r.status_code == 200 and r.text.startswith("BEGIN:VCALENDAR")
     assert client.get("/api/v1/panchang", params={"date": "bad"}).status_code == 400
+
+
+def test_immune_to_global_sidereal_mode():
+    """Another request switching swisseph's process-global ayanamsa must not move panchang results."""
+    import swisseph as swe
+    swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+    a = market_calendar(date(2026, 11, 5), 30)["events"]
+    swe.set_sid_mode(swe.SIDM_KRISHNAMURTI, 0, 0)
+    try:
+        b = market_calendar(date(2026, 11, 5), 30)["events"]
+    finally:
+        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+    assert a == b

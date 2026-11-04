@@ -74,6 +74,7 @@ bash scripts/test_gateway.sh             # expect 11/11 PASS ✅
 - [✨ 24. Jataka Wealth Blueprint, Model Zoo & Coverage Suite — v1.2](#section-24-v12-suite)
 - [🌈 25. Explain-Everything Upgrade — v1.3](#section-25-v13-suite)
 - [🪔 25b. Panchang, Market Weather & Public Deployment — v1.4](#section-25b-v14)
+- [📡 25c. Astrologer Signals & Vedic Branding — v1.5](#section-25c-v15)
 - [💬 26. Ready-to-Post ADO Comment](#section-22-ado-comment)
 - [🧾 27. Document Governance](#section-23-governance)
 
@@ -1007,6 +1008,20 @@ flowchart LR
 - Fixed: Turbopack build crash when the backend `venv` exists inside the repo.
 
 > 🛡️ Panchang notes are cultural context. Statistics are historical and illustrative. Not financial advice.
+
+<a id="section-25c-v15"></a>
+## 📡 25c. Astrologer Signals & Vedic Branding — v1.5
+
+- **Astrologer Signals card**: tracks financial astrologers' YouTube channels (Prashant Kapoor, `@AstroKapoorcom`, by default; add any handle). Each video is linked, tagged with the market it names and a bullish / bearish / big-move lean from its title and description, and graded on the next 5 trading sessions against real prices. The track record is compared with what a coin-flip in the same direction would score.
+- **Consensus** for the selected instrument (recent calls weighted by recency) and **detailed insights**: direction mix, markets, planets, themes (eclipse, retrograde, Diwali, Fed…) and the months named.
+- **Discovery**: recent predictions from YouTube search and Reddit, tagged and summarised the same way. X / Instagram / Facebook need signed-in APIs and are not searched.
+- **Log a call you heard**: saved in the browser and graded once its window closes.
+- **Branding**: new Vedic logo (North Indian kundali inside a 12-sign rashi wheel, Surya bindu, rising market line) as header mark and favicon; package renamed `astrotrader` 1.5.0.
+- **Fix**: panchang longitudes no longer depend on swisseph's process-global sidereal mode, which a concurrent KP/Raman jataka request could switch (ingress times shifted by up to two days in the live UI).
+
+Endpoints: `GET /astrologers/sources`, `GET /astrologers/feed?handles=&symbol=&horizon=`, `GET /astrologers/discover?symbol=`, `POST /astrologers/score`.
+
+> 🛡️ Directions are a keyword reading of public headlines, not of the video content; samples are small. Illustrative only, not financial advice.
 
 ## 💬 26. Ready-to-Post ADO Comment
 

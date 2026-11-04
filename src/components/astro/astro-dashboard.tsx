@@ -18,6 +18,7 @@ import { ConceptsCard } from './concepts-card';
 import { FinalStrategyCard } from './final-strategy-card';
 import { InstrumentPicker } from './instrument-picker';
 import { PanchangCard } from './panchang-card';
+import { AstrologerSignalsCard } from './astrologer-signals-card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -88,10 +89,7 @@ export function AstroDashboard() {
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-full border border-[#d9b46a] bg-gradient-to-br from-[#fdeecd] to-[#f7dfb2] shadow-[0_2px_10px_rgba(201,150,46,0.25)]">
-                <span className="font-brand text-xl leading-none text-[#a8701a]">ॐ</span>
-                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-gradient-to-br from-[#e8a04c] to-[#c9553f] shadow-sm" />
-              </div>
+              <img src="/logo.svg" alt="AstroTrader logo: kundali in a rashi wheel" className="h-12 w-12 drop-shadow-[0_2px_8px_rgba(201,150,46,0.35)]" />
               <div>
                 <h1 className="font-brand text-2xl leading-tight tracking-wide">
                   Astro<span className="gold-text">Trader</span>
@@ -178,6 +176,10 @@ export function AstroDashboard() {
 
         <div className="mt-4">
           <PanchangCard symbol={symbol} />
+        </div>
+
+        <div className="mt-4">
+          <AstrologerSignalsCard symbol={symbol} symbolName={quote?.name} />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4">

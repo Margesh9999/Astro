@@ -25,10 +25,18 @@ jobs:
           curl -sS -m 120 --retry 2 -f "$API/api/v1/panchang/calendar?days=7" | head -c 400; echo
           curl -sS -m 120 --retry 2 -f "$API/api/v1/planetary/$(date -u +%F)?vedic=true" | head -c 400; echo
           curl -sS -m 120 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/market/%5EGSPC" | head -c 800; echo
+      - name: Astrologer signals (live YouTube / Reddit)
+        run: |
+          set -x
+          curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/astrologers/feed?symbol=%5ENSEI" | head -c 3000; echo
+          curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/astrologers/discover" | head -c 3000; echo
+          curl -sS -m 180 -f "$API/api/v1/astrologers/feed" | python3 -c "import json,sys; j=json.load(sys.stdin); s=j['sources'][0]; print('feed ok:', s['ok'], len(s.get('videos') or []), 'videos;', s.get('track_record')); print(j['insights']['summary'])"
+          curl -sS -m 180 -f "$API/api/v1/astrologers/discover" | python3 -c "import json,sys; j=json.load(sys.stdin); print('discover:', len(j['items']), 'items; errors:', j['errors']); print(j['insights']['summary'])"
       - name: Web
         run: |
           set -x
           curl -sS -m 120 --retry 3 --retry-delay 15 --retry-all-errors -f "$WEB/" | grep -o "<title>[^<]*</title>"
+          curl -sS -m 60 -f -o /dev/null -w "logo %{http_code} %{content_type}\n" "$WEB/logo.svg"
           curl -sS -m 120 --retry 2 -f "$WEB/api/astro/health"
           curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$WEB/api/astro/panchang?symbol=%5EGSPC" | head -c 3000; echo
           curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$WEB/api/astro/cycles/clock" | head -c 600; echo
