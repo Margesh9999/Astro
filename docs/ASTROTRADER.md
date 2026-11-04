@@ -992,7 +992,7 @@ flowchart LR
 ### 25b.1a Live deployment
 - Web app: https://astrotrader-ten.vercel.app (Vercel project `astrotrader`)
 - API: https://astrotrader-api.vercel.app/docs (Vercel project `astrotrader-api`, root `mini-services/astro-backend`)
-- Both projects are linked to this repo, so every push gets a preview and `.github/workflows/deploy-smoke.yml` probes each ready deployment.
+- Both projects are linked to this repo, so every push gets a preview and `.github/workflows/live-smoke.yml` probes the live URLs on every push and daily.
 
 ### 25b.2 New endpoints (`/api/v1`)
 | Endpoint | Purpose |
