@@ -1,0 +1,30 @@
+name: Deploy smoke test
+# Vercel posts a GitHub deployment status when a preview/production deploy is ready.
+# This hits the live URL so a broken deploy shows up as a red check on the commit.
+on: deployment_status
+
+jobs:
+  smoke:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe ${{ github.event.deployment_status.environment_url }}
+        env:
+          URL: ${{ github.event.deployment_status.environment_url }}
+        run: |
+          set -u
+          get() { curl -sS -m 120 --retry 3 --retry-delay 10 -w '\n[HTTP %{http_code}]\n' "$URL$1"; }
+          if curl -sf -m 120 "$URL/api/v1/health" >/dev/null; then
+            echo "== API deployment =="
+            get /api/v1/health
+            get "/api/v1/panchang" | head -c 1500; echo
+            get "/api/v1/planetary/$(date -u +%F)?vedic=true" | head -c 600; echo
+            get "/api/v1/market/%5EGSPC" | head -c 600; echo
+            curl -sf -m 120 "$URL/api/v1/panchang/calendar?days=7" >/dev/null
+          else
+            echo "== Web deployment =="
+            curl -sf -m 120 "$URL/" | grep -q "AstroTrader"
+            get /api/astro/health
+            get "/api/astro/panchang?symbol=%5EGSPC" | head -c 2500; echo
+            get "/api/astro/market/%5EGSPC" | head -c 600; echo
+          fi

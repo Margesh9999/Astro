@@ -73,6 +73,7 @@ bash scripts/test_gateway.sh             # expect 11/11 PASS ✅
 - [🏛️ 23. Institutional Quant Desk and Options Lab](#section-23-quant-desk)
 - [✨ 24. Jataka Wealth Blueprint, Model Zoo & Coverage Suite — v1.2](#section-24-v12-suite)
 - [🌈 25. Explain-Everything Upgrade — v1.3](#section-25-v13-suite)
+- [🪔 25b. Panchang, Market Weather & Public Deployment — v1.4](#section-25b-v14)
 - [💬 26. Ready-to-Post ADO Comment](#section-22-ado-comment)
 - [🧾 27. Document Governance](#section-23-governance)
 
@@ -971,6 +972,42 @@ Later mahadashas are unchanged (full length, ADs start with their own lord, `AD 
 ---
 
 <a id="section-22-ado-comment"></a>
+<a id="section-25b-v14"></a>
+## 🪔 25b. Panchang, Market Weather & Public Deployment — v1.4
+
+### 25b.1 What shipped
+- **Panchang & Market Weather card**: tithi, nakshatra (pada, lord), yoga, karana and vara at local sunrise, each with its end time; Rahu Kaal, Yamaganda, Gulika, Abhijit muhurta; location picker (Mumbai NSE/BSE default).
+- **What history says for the selected stock**: historical returns on days sharing today's Moon nakshatra and paksha, with the v1.3 significance verdict (most read *noise*; that is the honest answer).
+- **30-day calendar**: green / amber / red days (no marker / one mild marker / traditional stand-aside: Amavasya, Vishti, Gandanta), sign ingresses, retrograde/direct stations and eclipses, plus an **.ics export**.
+- **Deployability**: `ASTRO_BACKEND_URL` (frontend → hosted API), `/tmp` cache on serverless, Vercel config, Dockerfiles + `docker compose up --build`, GitHub Actions CI. Optional boosters moved to `requirements-ml.txt`.
+
+```mermaid
+flowchart LR
+  U[Browser] --> W[Next.js on Vercel<br/>astrotrader]
+  W -->|/api/astro/* proxy<br/>ASTRO_BACKEND_URL| A[FastAPI on Vercel<br/>astrotrader-api]
+  A --> E[Swiss Ephemeris<br/>panchang, kundali]
+  A --> M[Yahoo / Stooq<br/>or demo data]
+```
+
+### 25b.1a Live deployment
+- Web app: https://astrotrader-ten.vercel.app (Vercel project `astrotrader`)
+- API: https://astrotrader-api.vercel.app/docs (Vercel project `astrotrader-api`, root `mini-services/astro-backend`)
+- Both projects are linked to this repo, so every push gets a preview and `.github/workflows/deploy-smoke.yml` probes each ready deployment.
+
+### 25b.2 New endpoints (`/api/v1`)
+| Endpoint | Purpose |
+|---|---|
+| `GET /panchang?date=&lat=&lon=&tz=&place=&symbol=` | five limbs + Rahu Kaal + optional symbol history |
+| `GET /panchang/calendar?start=&days=` | N-day calendar (max 120) + sky events |
+| `GET /panchang/calendar.ics` | the same as iCalendar |
+
+### 25b.3 QA evidence (*Observed*, 2026-11-04)
+- 57 backend tests pass (`ASTRO_DEMO_DATA=1`), 5 new: label tables, Diwali 2026 Amavasya, limb ordering, Sun→Scorpio Sankranti in the 30-day window, API + ICS.
+- `next build` passes; headless-Chromium render of the dashboard showed no console or network errors.
+- Fixed: Turbopack build crash when the backend `venv` exists inside the repo.
+
+> 🛡️ Panchang notes are cultural context. Statistics are historical and illustrative. Not financial advice.
+
 ## 💬 26. Ready-to-Post ADO Comment
 
 > 🙏✨ Hi team! AstroTrader **v1.3** is ready — the dashboard now explains itself. Every chart ends with plain-English *Shows · Means · Do* lines 💡; the Quant Desk gained Signals (24 classic rules backtested on full history), Heatmaps, Risk & Regime and Portfolio tabs 📊; Model Lab runs **~47 models on each stock's entire history** (S&P 500 since 1928) 🧠; Suri cycles and every 45-day sky event are backed by an event study on the selected stock 🌕; the kundli is location- and DST-aware with a symbol legend, a Stock × Kundli correlation tab and the **drikpanchang-correct antardasha** 🕉️; a TradingAgents-style desk 🤖 and a final 30/60/90/365-day strategy with an illustrative £500/week income plan close the page 🎯. 52 backend tests green ✅ — details in `ASTROTRADER.md` §25. Educational research, not financial advice. 🌸🪐
