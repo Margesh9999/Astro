@@ -19,6 +19,7 @@ import { FinalStrategyCard } from './final-strategy-card';
 import { InstrumentPicker } from './instrument-picker';
 import { PanchangCard } from './panchang-card';
 import { AstrologerSignalsCard } from './astrologer-signals-card';
+import { MarketOutlookCard } from './market-outlook-card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -179,7 +180,7 @@ export function AstroDashboard() {
         </div>
 
         <div className="mt-4">
-          <AstrologerSignalsCard symbol={symbol} symbolName={quote?.name} />
+          <MarketOutlookCard />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4">
@@ -231,7 +232,7 @@ export function AstroDashboard() {
           </div>
         </section>
 
-        {/* ── Final Strategy: every signal → one plan (keep as the last section) ── */}
+        {/* ── Final Strategy: every signal → one plan ── */}
         <section className="mt-8">
           <div className="mb-3 flex items-center gap-3">
             <h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-[#97795a]">
@@ -240,6 +241,17 @@ export function AstroDashboard() {
             <div className="h-px flex-1 bg-gradient-to-r from-[#e3cfa4] to-transparent" />
           </div>
           <FinalStrategyCard symbol={symbol} symbolName={quote?.name} />
+        </section>
+
+        {/* ── Astrologer Signals (YouTube & Reddit predictions), kept at the bottom ── */}
+        <section className="mt-8">
+          <div className="mb-3 flex items-center gap-3">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-[#97795a]">
+              ✦ Astrologer Signals
+            </h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-[#e3cfa4] to-transparent" />
+          </div>
+          <AstrologerSignalsCard symbol={symbol} symbolName={quote?.name} />
         </section>
 
         {loadingCore && (

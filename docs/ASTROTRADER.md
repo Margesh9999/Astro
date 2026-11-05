@@ -75,6 +75,7 @@ bash scripts/test_gateway.sh             # expect 11/11 PASS ✅
 - [🌈 25. Explain-Everything Upgrade — v1.3](#section-25-v13-suite)
 - [🪔 25b. Panchang, Market Weather & Public Deployment — v1.4](#section-25b-v14)
 - [📡 25c. Astrologer Signals & Vedic Branding — v1.5](#section-25c-v15)
+- [🧭 25d. Market Outlook & Income Plan — v1.6](#section-25d-v16)
 - [💬 26. Ready-to-Post ADO Comment](#section-22-ado-comment)
 - [🧾 27. Document Governance](#section-23-governance)
 
@@ -1022,6 +1023,17 @@ flowchart LR
 Endpoints: `GET /astrologers/sources`, `GET /astrologers/feed?handles=&symbol=&horizon=`, `GET /astrologers/discover?symbol=`, `POST /astrologers/score`.
 
 > 🛡️ Directions are a keyword reading of public headlines, not of the video content; samples are small. Illustrative only, not financial advice.
+
+<a id="section-25d-v16"></a>
+## 🧭 25d. Market Outlook & Income Plan — v1.6
+
+- **Where**: the new *Market Outlook & Income Plan* card sits right after the Panchang. Astrologer Signals moved to the very bottom of the page.
+- **Sector forecast** (`GET /api/v1/outlook`, `app/services/market_outlook.py`): each graha gets a daily transit strength from its sidereal dignity, minus penalties for retrograde and combustion. Ten Indian sectors are ruled by weighted planets (banks by Jupiter, IT by Mercury and Rahu, metals by Mars and Saturn, and so on). The score is averaged over the week, month or year ahead and z-scored against 25 years of its own history: above +0.5 reads up, below −0.5 reads down, otherwise range-bound.
+- **Back-test**: the same rule is replayed on each sector's Nifty index (^NSEBANK, ^CNXIT, ^CNXMETAL…) over non-overlapping windows, and its hit rate is compared with the base rate. Each call shows *significant edge*, *weak hint* or *no edge (noise)*.
+- **Options ideas**: credit spreads for income (bull put / bear call / iron condor), debit spreads for a directional bet, always defined risk. Weekly ideas use Nifty weekly options, since stock options expire monthly. The size advice depends on the back-test verdict.
+- **Income plan**: three buckets: weekly (Nifty premium selling with LIQUIDBEES collateral, capped at 30%), monthly (SWP from arbitrage, equity-savings and balanced-advantage funds, plus corporate or PSU bond funds) and yearly (NIFTYBEES/JUNIORBEES core, GOLDBEES hedge, and an ETF tilt to sectors the year favours). The split uses the jataka's strategy fits from the birth details saved in the Janma Kundli form, and it flags sectors where the chart and the transits agree.
+- Educational and illustrative only, not financial advice.
+
 
 ## 💬 26. Ready-to-Post ADO Comment
 

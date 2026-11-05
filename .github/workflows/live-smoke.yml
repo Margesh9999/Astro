@@ -32,6 +32,16 @@ jobs:
           curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/astrologers/discover" | head -c 3000; echo
           curl -sS -m 180 -f "$API/api/v1/astrologers/feed" | python3 -c "import json,sys; j=json.load(sys.stdin); s=j['sources'][0]; print('feed ok:', s['ok'], len(s.get('videos') or []), 'videos;', s.get('track_record')); print(j['insights']['summary'])"
           curl -sS -m 180 -f "$API/api/v1/astrologers/discover" | python3 -c "import json,sys; j=json.load(sys.stdin); print('discover:', len(j['items']), 'items; errors:', j['errors']); print(j['insights']['summary'])"
+      - name: Market outlook (sector forecast back-tested on live prices)
+        run: |
+          curl -sS -m 280 -f "$API/api/v1/outlook?name=Margesh&birth_date=1994-04-23&time=06:45&place=Vallabh%20Vidyanagar" | python3 -c "
+          import json,sys; j=json.load(sys.stdin)
+          for h,v in j['horizons'].items():
+              print(h.upper(), v['summary'])
+              for s in v['sectors']:
+                  b=s['backtest']; print('  %-32s %-5s z=%+.2f  %s  hit=%s exp=%s n=%s since=%s' % (s['sector'], s['direction'], s['z'], b.get('verdict'), b.get('hit_pct'), b.get('expected_pct'), b.get('n'), b.get('since')))
+          print('plan:', [(b['horizon'], b['allocation_pct'], b['chart_fit']) for b in j['income_plan']['buckets']], j['income_plan']['personal_picks'], 'jataka used:', j['jataka']['used'])
+          "
       - name: Web
         run: |
           set -x
