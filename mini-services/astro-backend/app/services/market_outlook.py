@@ -228,7 +228,9 @@ def backtest(close: pd.Series, zs: np.ndarray, sessions: int) -> Dict:
     zstat = (float(hit.sum()) - exp) / math.sqrt(var) if var > 0 else 0.0
     up_ret = fwd[calls > 0].mean() if (calls > 0).any() else float("nan")
     dn_ret = fwd[calls < 0].mean() if (calls < 0).any() else float("nan")
-    if zstat >= 1.96:
+    if n < 15:
+        verdict = "too few calls to judge"
+    elif zstat >= 1.96:
         verdict = "significant edge"
     elif zstat >= 1.0:
         verdict = "weak hint"
