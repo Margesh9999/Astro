@@ -1,0 +1,18 @@
+# One-command local stack:  docker compose up --build   ->  http://localhost:3000
+# Offline / CI:              ASTRO_DEMO_DATA=1 docker compose up --build
+services:
+  api:
+    build: ./mini-services/astro-backend
+    environment:
+      - ASTRO_DEMO_DATA=${ASTRO_DEMO_DATA:-}
+    volumes:
+      - astro-cache:/data
+    ports: ["8000:8000"]
+  web:
+    build: .
+    environment:
+      - ASTRO_BACKEND_URL=http://api:8000
+    depends_on: [api]
+    ports: ["3000:3000"]
+volumes:
+  astro-cache:

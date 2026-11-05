@@ -21,7 +21,7 @@ class PredictorService:
     def __init__(
         self,
         ephe_path: str = "",
-        cache_dir: str = "./data",
+        cache_dir: Optional[str] = None,
         use_vedic: bool = False
     ):
         """

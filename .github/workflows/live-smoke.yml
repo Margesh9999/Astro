@@ -1,0 +1,52 @@
+name: Live smoke test
+# Probes the public Vercel production deployments (web + API). Informational: it checks
+# what is live right now, which may lag this commit until it is deployed.
+on:
+  push:
+    branches: [main, "feat/**"]
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      API: https://astrotrader-api.vercel.app
+      WEB: https://astrotrader-ten.vercel.app
+    steps:
+      - name: API
+        run: |
+          set -x
+          sleep 150  # let a just-pushed production build settle
+          curl -sS -m 120 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/health" || true
+          curl -sS -m 120 --retry 3 --retry-delay 15 --retry-all-errors -f "$API/api/v1/health"
+          curl -sS -m 120 --retry 2 -f "$API/api/v1/panchang" | head -c 1500; echo
+          curl -sS -m 120 --retry 2 -f "$API/api/v1/panchang/calendar?days=7" | head -c 400; echo
+          curl -sS -m 120 --retry 2 -f "$API/api/v1/planetary/$(date -u +%F)?vedic=true" | head -c 400; echo
+          curl -sS -m 120 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/market/%5EGSPC" | head -c 800; echo
+      - name: Astrologer signals (live YouTube / Reddit)
+        run: |
+          set -x
+          curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/astrologers/feed?symbol=%5ENSEI" | head -c 3000; echo
+          curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$API/api/v1/astrologers/discover" | head -c 3000; echo
+          curl -sS -m 180 -f "$API/api/v1/astrologers/feed" | python3 -c "import json,sys; j=json.load(sys.stdin); s=j['sources'][0]; print('feed ok:', s['ok'], len(s.get('videos') or []), 'videos;', s.get('track_record')); print(j['insights']['summary'])"
+          curl -sS -m 180 -f "$API/api/v1/astrologers/discover" | python3 -c "import json,sys; j=json.load(sys.stdin); print('discover:', len(j['items']), 'items; errors:', j['errors']); print(j['insights']['summary'])"
+      - name: Market outlook (sector forecast back-tested on live prices)
+        run: |
+          curl -sS -m 280 -f "$API/api/v1/outlook?name=Margesh&birth_date=1994-04-23&time=06:45&place=Vallabh%20Vidyanagar" | python3 -c "
+          import json,sys; j=json.load(sys.stdin)
+          for h,v in j['horizons'].items():
+              print(h.upper(), v['summary'])
+              for s in v['sectors']:
+                  b=s['backtest']; print('  %-32s %-5s z=%+.2f  %s  hit=%s exp=%s n=%s since=%s' % (s['sector'], s['direction'], s['z'], b.get('verdict'), b.get('hit_pct'), b.get('expected_pct'), b.get('n'), b.get('since')))
+          print('plan:', [(b['horizon'], b['allocation_pct'], b['chart_fit']) for b in j['income_plan']['buckets']], j['income_plan']['personal_picks'], 'jataka used:', j['jataka']['used'])
+          "
+      - name: Web
+        run: |
+          set -x
+          curl -sS -m 120 --retry 3 --retry-delay 15 --retry-all-errors -f "$WEB/" | grep -o "<title>[^<]*</title>"
+          curl -sS -m 60 -f -o /dev/null -w "logo %{http_code} %{content_type}\n" "$WEB/logo.svg"
+          curl -sS -m 120 --retry 2 -f "$WEB/api/astro/health"
+          curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$WEB/api/astro/panchang?symbol=%5EGSPC" | head -c 3000; echo
+          curl -sS -m 180 -w '\n[HTTP %{http_code}]\n' "$WEB/api/astro/cycles/clock" | head -c 600; echo

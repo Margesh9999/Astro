@@ -31,8 +31,9 @@ function clearChild() {
 }
 
 function spawnBackend(): ChildProcess | null {
-  const backendDir = path.join(process.cwd(), 'mini-services', 'astro-backend');
-  const pythonBin = path.join(backendDir, 'venv', 'bin', 'python');
+  // built at runtime (not path.join(cwd, …)) so Turbopack doesn't try to trace the Python venv
+  const backendDir = process.env.ASTRO_BACKEND_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), 'mini-services', 'astro-backend');
+  const pythonBin = path.join(/* turbopackIgnore: true */ backendDir, 'venv', 'bin', 'python');
   if (!existsSync(pythonBin)) {
     console.warn('[astro-backend] venv python not found at', pythonBin);
     return null;
@@ -76,6 +77,8 @@ function childAlive(): boolean {
 }
 
 export async function ensureAstroBackend(): Promise<boolean> {
+  // Hosted mode: the backend lives elsewhere (ASTRO_BACKEND_URL) — never spawn locally.
+  if (process.env.ASTRO_BACKEND_URL || process.env.VERCEL) return true;
   // Fast path: already up (spawned by us, by dev.sh, or manually)
   if (await isBackendUp()) {
     g.__astroBackendSpawned = true;

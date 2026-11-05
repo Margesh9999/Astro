@@ -64,15 +64,21 @@ def synthetic_history(symbol: str, period: str = "10y") -> pd.DataFrame:
 class MarketDataService:
     """Service for fetching and processing market data"""
 
-    def __init__(self, cache_dir: str = "./data"):
+    def __init__(self, cache_dir: Optional[str] = None):
         """
         Initialize market data service
 
         Args:
             cache_dir: Directory for caching data
         """
+        if cache_dir is None:
+            from app.core.config import settings
+            cache_dir = settings.ASTRO_CACHE_DIR
         self.cache_dir = cache_dir
-        os.makedirs(cache_dir, exist_ok=True)
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except OSError as exc:  # read-only filesystem (serverless): run without a disk cache
+            logger.warning(f"cache dir {cache_dir!r} not writable: {exc}")
         # In-memory TTL caches (survives within the uvicorn worker process)
         #   _hist_cache:  key -> (dataframe, fetched_at)   TTL 15 min
         #   _info_cache:  symbol -> (info dict, fetched_at) TTL 6 h

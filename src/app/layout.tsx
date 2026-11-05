@@ -34,7 +34,8 @@ export const metadata: Metadata = {
   keywords: ["astrotrader", "vedic", "kundali", "north indian chart", "swiss ephemeris", "market data", "educational"],
   authors: [{ name: "AstroTrader" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
+    apple: "/logo.svg",
   },
   openGraph: {
     title: "AstroTrader — Vedic Jyotisha × Market Data",

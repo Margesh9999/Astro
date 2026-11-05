@@ -17,6 +17,9 @@ import { AgentsCard } from './agents-card';
 import { ConceptsCard } from './concepts-card';
 import { FinalStrategyCard } from './final-strategy-card';
 import { InstrumentPicker } from './instrument-picker';
+import { PanchangCard } from './panchang-card';
+import { AstrologerSignalsCard } from './astrologer-signals-card';
+import { MarketOutlookCard } from './market-outlook-card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -87,10 +90,7 @@ export function AstroDashboard() {
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-full border border-[#d9b46a] bg-gradient-to-br from-[#fdeecd] to-[#f7dfb2] shadow-[0_2px_10px_rgba(201,150,46,0.25)]">
-                <span className="font-brand text-xl leading-none text-[#a8701a]">ॐ</span>
-                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-gradient-to-br from-[#e8a04c] to-[#c9553f] shadow-sm" />
-              </div>
+              <img src="/logo.svg" alt="AstroTrader logo: kundali in a rashi wheel" className="h-12 w-12 drop-shadow-[0_2px_8px_rgba(201,150,46,0.35)]" />
               <div>
                 <h1 className="font-brand text-2xl leading-tight tracking-wide">
                   Astro<span className="gold-text">Trader</span>
@@ -163,8 +163,8 @@ export function AstroDashboard() {
       <main className="relative mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {backendOk === false && (
           <div className="mb-6 rounded-lg border border-[#eecfc7] bg-[#fbeae4] px-4 py-3 text-sm text-[#a14d3c]">
-            Backend service is not responding. It boots automatically with the app — try refreshing in a
-            few seconds.
+            Backend service is not responding. Locally it boots automatically with the app; on a hosted
+            deployment it may be waking from a cold start. Try refreshing in a few seconds.
           </div>
         )}
 
@@ -173,6 +173,14 @@ export function AstroDashboard() {
           <div className="lg:col-span-2">
             <PlanetaryCard data={planetary} loading={loadingCore} vedic={VEDIC} />
           </div>
+        </div>
+
+        <div className="mt-4">
+          <PanchangCard symbol={symbol} />
+        </div>
+
+        <div className="mt-4">
+          <MarketOutlookCard />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4">
@@ -224,7 +232,7 @@ export function AstroDashboard() {
           </div>
         </section>
 
-        {/* ── Final Strategy: every signal → one plan (keep as the last section) ── */}
+        {/* ── Final Strategy: every signal → one plan ── */}
         <section className="mt-8">
           <div className="mb-3 flex items-center gap-3">
             <h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-[#97795a]">
@@ -233,6 +241,17 @@ export function AstroDashboard() {
             <div className="h-px flex-1 bg-gradient-to-r from-[#e3cfa4] to-transparent" />
           </div>
           <FinalStrategyCard symbol={symbol} symbolName={quote?.name} />
+        </section>
+
+        {/* ── Astrologer Signals (YouTube & Reddit predictions), kept at the bottom ── */}
+        <section className="mt-8">
+          <div className="mb-3 flex items-center gap-3">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-[#97795a]">
+              ✦ Astrologer Signals
+            </h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-[#e3cfa4] to-transparent" />
+          </div>
+          <AstrologerSignalsCard symbol={symbol} symbolName={quote?.name} />
         </section>
 
         {loadingCore && (
