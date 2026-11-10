@@ -336,7 +336,8 @@ def run(market, symbol: str = "^NSEI", strategy: str = "put_spread", alloc: floa
 
     base = results[0]
     srcs = src.value_counts().to_dict()
-    summary = (f"Selling a {STRATEGIES[strategy].split(' (')[0].lower()} on {symbol} every week since {dates[0][:4]} "
+    name = STRATEGIES[strategy].split(' (')[0].lower()
+    summary = (f"Selling {'an' if name[0] in 'aeiou' else 'a'} {name} on {symbol} every week since {dates[0][:4]} "
                f"won {base['win_rate_pct']}% of weeks and averaged {base['avg_week_on_margin_pct']}% a week on the margin used, "
                f"but {worst_phrase(base['worst_week_on_margin_pct'])}. Risking {round(alloc * 100)}% of capital "
                f"a week, the account compounded at about {base['cagr_pct']}% a year with a worst drawdown of "
