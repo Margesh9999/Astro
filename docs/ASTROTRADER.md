@@ -73,6 +73,9 @@ bash scripts/test_gateway.sh             # expect 11/11 PASS ✅
 - [🏛️ 23. Institutional Quant Desk and Options Lab](#section-23-quant-desk)
 - [✨ 24. Jataka Wealth Blueprint, Model Zoo & Coverage Suite — v1.2](#section-24-v12-suite)
 - [🌈 25. Explain-Everything Upgrade — v1.3](#section-25-v13-suite)
+- [🪔 25b. Panchang, Market Weather & Public Deployment — v1.4](#section-25b-v14)
+- [📡 25c. Astrologer Signals & Vedic Branding — v1.5](#section-25c-v15)
+- [🧭 25d. Market Outlook & Income Plan — v1.6](#section-25d-v16)
 - [💬 26. Ready-to-Post ADO Comment](#section-22-ado-comment)
 - [🧾 27. Document Governance](#section-23-governance)
 
@@ -971,6 +974,74 @@ Later mahadashas are unchanged (full length, ADs start with their own lord, `AD 
 ---
 
 <a id="section-22-ado-comment"></a>
+<a id="section-25b-v14"></a>
+## 🪔 25b. Panchang, Market Weather & Public Deployment — v1.4
+
+### 25b.1 What shipped
+- **Panchang & Market Weather card**: tithi, nakshatra (pada, lord), yoga, karana and vara at local sunrise, each with its end time; Rahu Kaal, Yamaganda, Gulika, Abhijit muhurta; location picker (Mumbai NSE/BSE default).
+- **What history says for the selected stock**: historical returns on days sharing today's Moon nakshatra and paksha, with the v1.3 significance verdict (most read *noise*; that is the honest answer).
+- **30-day calendar**: green / amber / red days (no marker / one mild marker / traditional stand-aside: Amavasya, Vishti, Gandanta), sign ingresses, retrograde/direct stations and eclipses, plus an **.ics export**.
+- **Deployability**: `ASTRO_BACKEND_URL` (frontend → hosted API), `/tmp` cache on serverless, Vercel config, Dockerfiles + `docker compose up --build`, GitHub Actions CI. Optional boosters moved to `requirements-ml.txt`.
+
+```mermaid
+flowchart LR
+  U[Browser] --> W[Next.js on Vercel<br/>astrotrader]
+  W -->|/api/astro/* proxy<br/>ASTRO_BACKEND_URL| A[FastAPI on Vercel<br/>astrotrader-api]
+  A --> E[Swiss Ephemeris<br/>panchang, kundali]
+  A --> M[Yahoo / Stooq<br/>or demo data]
+```
+
+### 25b.1a Live deployment
+- Web app: https://astrotrader-ten.vercel.app (Vercel project `astrotrader`)
+- API: https://astrotrader-api.vercel.app/docs (Vercel project `astrotrader-api`, root `mini-services/astro-backend`)
+- Both projects are linked to this repo, so every push gets a preview and `.github/workflows/live-smoke.yml` probes the live URLs on every push and daily.
+
+### 25b.2 New endpoints (`/api/v1`)
+| Endpoint | Purpose |
+|---|---|
+| `GET /panchang?date=&lat=&lon=&tz=&place=&symbol=` | five limbs + Rahu Kaal + optional symbol history |
+| `GET /panchang/calendar?start=&days=` | N-day calendar (max 120) + sky events |
+| `GET /panchang/calendar.ics` | the same as iCalendar |
+
+### 25b.3 QA evidence (*Observed*, 2026-11-04)
+- 57 backend tests pass (`ASTRO_DEMO_DATA=1`), 5 new: label tables, Diwali 2026 Amavasya, limb ordering, Sun→Scorpio Sankranti in the 30-day window, API + ICS.
+- `next build` passes; headless-Chromium render of the dashboard showed no console or network errors.
+- Fixed: Turbopack build crash when the backend `venv` exists inside the repo.
+
+> 🛡️ Panchang notes are cultural context. Statistics are historical and illustrative. Not financial advice.
+
+<a id="section-25c-v15"></a>
+## 📡 25c. Astrologer Signals & Vedic Branding — v1.5
+
+- **Astrologer Signals card**: tracks financial astrologers' YouTube channels (Prashant Kapoor, `@AstroKapoorcom`, by default; add any handle). Each video is linked, tagged with the market it names and a bullish / bearish / big-move lean from its title and description, and graded on the next 5 trading sessions against real prices. The track record is compared with what a coin-flip in the same direction would score.
+- **Consensus** for the selected instrument (recent calls weighted by recency) and **detailed insights**: direction mix, markets, planets, themes (eclipse, retrograde, Diwali, Fed…) and the months named.
+- **Discovery**: recent predictions from YouTube search and Reddit, tagged and summarised the same way. X / Instagram / Facebook need signed-in APIs and are not searched.
+- **Log a call you heard**: saved in the browser and graded once its window closes.
+- **Branding**: new Vedic logo (North Indian kundali inside a 12-sign rashi wheel, Surya bindu, rising market line) as header mark and favicon; package renamed `astrotrader` 1.5.0.
+- **Fix**: panchang longitudes no longer depend on swisseph's process-global sidereal mode, which a concurrent KP/Raman jataka request could switch (ingress times shifted by up to two days in the live UI).
+
+Endpoints: `GET /astrologers/sources`, `GET /astrologers/feed?handles=&symbol=&horizon=`, `GET /astrologers/discover?symbol=`, `POST /astrologers/score`.
+
+> 🛡️ Directions are a keyword reading of public headlines, not of the video content; samples are small. Illustrative only, not financial advice.
+
+<a id="section-25d-v16"></a>
+## 🧭 25d. Market Outlook & Income Plan — v1.6
+
+- **Where**: the new *Market Outlook & Income Plan* card sits right after the Panchang. Astrologer Signals moved to the very bottom of the page.
+- **Sector forecast** (`GET /api/v1/outlook`, `app/services/market_outlook.py`): each graha gets a daily transit strength from its sidereal dignity, minus penalties for retrograde and combustion. Ten Indian sectors are ruled by weighted planets (banks by Jupiter, IT by Mercury and Rahu, metals by Mars and Saturn, and so on). The score is averaged over the week, month or year ahead and z-scored against 25 years of its own history: above +0.5 reads up, below −0.5 reads down, otherwise range-bound.
+- **Back-test**: the same rule is replayed on each sector's Nifty index (^NSEBANK, ^CNXIT, ^CNXMETAL…) over non-overlapping windows, and its hit rate is compared with the base rate. Each call shows *significant edge*, *weak hint* or *no edge (noise)*.
+- **Options ideas**: credit spreads for income (bull put / bear call / iron condor), debit spreads for a directional bet, always defined risk. Weekly ideas use Nifty weekly options, since stock options expire monthly. The size advice depends on the back-test verdict.
+- **Income plan**: three buckets: weekly (Nifty premium selling with LIQUIDBEES collateral, capped at 30%), monthly (SWP from arbitrage, equity-savings and balanced-advantage funds, plus corporate or PSU bond funds) and yearly (NIFTYBEES/JUNIORBEES core, GOLDBEES hedge, and an ETF tilt to sectors the year favours). The split uses the jataka's strategy fits from the birth details saved in the Janma Kundli form, and it flags sectors where the chart and the transits agree.
+- Educational and illustrative only, not financial advice.
+
+
+## 🧪 25e. Income Strategy Lab & Today's Brief — v1.7
+
+- **Income Strategy Lab** (`GET /api/v1/income-lab?symbol=^NSEI&strategy=put_spread|call_spread|iron_condor&risk=0.05`): sells the same defined-risk weekly spread (≈1.5% wide, Black-Scholes prices from India VIX / VIX, else realised vol × 1.1) every week since 2009, sized so a max loss costs `risk` of capital, idle cash earning 6.5%.
+- Each astrological filter (Amavasya/Purnima, eclipse, Mercury retrograde, sector-outlook lean) is compared with skipping the same number of **random** weeks 300 times. Verdicts: *helped beyond chance* (≥95th percentile), *hurt beyond chance* (≤5th), or *no better than skipping random weeks*. A high-volatility skip is included as a non-astro control.
+- **Today's Brief** (`GET /api/v1/brief`): the day's tone (panchang), the week's sector lean with which calls history backs, and this week's illustrative Nifty put spread.
+- Option prices are modelled, not real fills; there are no slippage or gap-risk extras beyond a flat cost. No result is a promise of future income.
+
 ## 💬 26. Ready-to-Post ADO Comment
 
 > 🙏✨ Hi team! AstroTrader **v1.3** is ready — the dashboard now explains itself. Every chart ends with plain-English *Shows · Means · Do* lines 💡; the Quant Desk gained Signals (24 classic rules backtested on full history), Heatmaps, Risk & Regime and Portfolio tabs 📊; Model Lab runs **~47 models on each stock's entire history** (S&P 500 since 1928) 🧠; Suri cycles and every 45-day sky event are backed by an event study on the selected stock 🌕; the kundli is location- and DST-aware with a symbol legend, a Stock × Kundli correlation tab and the **drikpanchang-correct antardasha** 🕉️; a TradingAgents-style desk 🤖 and a final 30/60/90/365-day strategy with an illustrative £500/week income plan close the page 🎯. 52 backend tests green ✅ — details in `ASTROTRADER.md` §25. Educational research, not financial advice. 🌸🪐

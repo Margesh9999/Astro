@@ -1,19 +1,19 @@
 import app.core.ssl_fix  # noqa: F401  repairs certifi bundle BEFORE yfinance/curl_cffi load
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes, routes_quant, routes_models, routes_cycles, routes_jataka, routes_strategy
+from app.api import routes, routes_quant, routes_models, routes_cycles, routes_jataka, routes_strategy, routes_panchang, routes_astrologers, routes_outlook
 from app.core.config import settings
 
 app = FastAPI(
     title="AstroTrader API",
     description="Technical exploration of planetary position calculations and market data correlations",
-    version="0.1.0"
+    version="1.7.0"
 )
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.ASTRO_CORS_ORIGINS] if isinstance(settings.ASTRO_CORS_ORIGINS, str) else settings.ASTRO_CORS_ORIGINS,
+    allow_origins=[o.strip() for o in settings.ASTRO_CORS_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,7 +22,8 @@ app.add_middleware(
 # Include API routes
 app.include_router(routes.router, prefix="/api/v1")
 # v1.3 feature routers — one per area so they evolve independently
-for _r in (routes_quant, routes_models, routes_cycles, routes_jataka, routes_strategy):
+for _r in (routes_quant, routes_models, routes_cycles, routes_jataka, routes_strategy,
+           routes_panchang, routes_astrologers, routes_outlook):
     app.include_router(_r.router, prefix="/api/v1")
 
 @app.get("/")

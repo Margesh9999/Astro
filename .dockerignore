@@ -1,0 +1,7 @@
+node_modules
+.next
+mini-services/astro-backend/venv
+mini-services/astro-backend/data
+backend
+**/__pycache__
+*.log
