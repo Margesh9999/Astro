@@ -42,6 +42,20 @@ jobs:
                   b=s['backtest']; print('  %-32s %-5s z=%+.2f  %s  hit=%s exp=%s n=%s since=%s' % (s['sector'], s['direction'], s['z'], b.get('verdict'), b.get('hit_pct'), b.get('expected_pct'), b.get('n'), b.get('since')))
           print('plan:', [(b['horizon'], b['allocation_pct'], b['chart_fit']) for b in j['income_plan']['buckets']], j['income_plan']['personal_picks'], 'jataka used:', j['jataka']['used'])
           "
+      - name: Income strategy lab (weekly spreads, astro filters vs random skips)
+        run: |
+          for st in put_spread iron_condor; do
+          curl -sS -m 280 -f "$API/api/v1/income-lab?symbol=%5ENSEI&strategy=$st&risk=0.05" | python3 -c "
+          import json,sys; j=json.load(sys.stdin)
+          print(j['strategy_label'], j['from'], '->', j['to'], 'vol', j['vol_source'], j['vol_index'])
+          print(j['summary'])
+          for r in j['results']:
+              print('  %-72s n=%s win=%s avg=%s worst=%s cagr=%s dd=%s pm=%s  %s %s' % (r['label'], r['weeks_traded'], r['win_rate_pct'], r['avg_week_on_margin_pct'], r['worst_week_on_margin_pct'], r['cagr_pct'], r['max_drawdown_pct'], r['positive_months_pct'], r['verdict'], r.get('vs_random_pct','')))
+          print('this week:', j['this_week'])
+          "
+          done
+      - name: Today's brief
+        run: curl -sS -m 280 -f "$API/api/v1/brief" | python3 -m json.tool
       - name: Web
         run: |
           set -x

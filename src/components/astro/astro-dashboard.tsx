@@ -20,6 +20,8 @@ import { InstrumentPicker } from './instrument-picker';
 import { PanchangCard } from './panchang-card';
 import { AstrologerSignalsCard } from './astrologer-signals-card';
 import { MarketOutlookCard } from './market-outlook-card';
+import { IncomeLabCard } from './income-lab-card';
+import { TodayBriefCard } from './today-brief-card';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -168,6 +170,10 @@ export function AstroDashboard() {
           </div>
         )}
 
+        <div className="mb-6">
+          <TodayBriefCard />
+        </div>
+
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <MarketCard quote={quote} loading={loadingCore} />
           <div className="lg:col-span-2">
@@ -181,6 +187,10 @@ export function AstroDashboard() {
 
         <div className="mt-4">
           <MarketOutlookCard />
+        </div>
+
+        <div className="mt-4">
+          <IncomeLabCard />
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4">

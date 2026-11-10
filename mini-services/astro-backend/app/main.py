@@ -7,7 +7,7 @@ from app.core.config import settings
 app = FastAPI(
     title="AstroTrader API",
     description="Technical exploration of planetary position calculations and market data correlations",
-    version="1.6.0"
+    version="1.7.0"
 )
 
 # Configure CORS

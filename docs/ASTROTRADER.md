@@ -1035,6 +1035,13 @@ Endpoints: `GET /astrologers/sources`, `GET /astrologers/feed?handles=&symbol=&h
 - Educational and illustrative only, not financial advice.
 
 
+## 🧪 25e. Income Strategy Lab & Today's Brief — v1.7
+
+- **Income Strategy Lab** (`GET /api/v1/income-lab?symbol=^NSEI&strategy=put_spread|call_spread|iron_condor&risk=0.05`): sells the same defined-risk weekly spread (≈1.5% wide, Black-Scholes prices from India VIX / VIX, else realised vol × 1.1) every week since 2009, sized so a max loss costs `risk` of capital, idle cash earning 6.5%.
+- Each astrological filter (Amavasya/Purnima, eclipse, Mercury retrograde, sector-outlook lean) is compared with skipping the same number of **random** weeks 300 times. Verdicts: *helped beyond chance* (≥95th percentile), *hurt beyond chance* (≤5th), or *no better than skipping random weeks*. A high-volatility skip is included as a non-astro control.
+- **Today's Brief** (`GET /api/v1/brief`): the day's tone (panchang), the week's sector lean with which calls history backs, and this week's illustrative Nifty put spread.
+- Option prices are modelled, not real fills; there are no slippage or gap-risk extras beyond a flat cost. No result is a promise of future income.
+
 ## 💬 26. Ready-to-Post ADO Comment
 
 > 🙏✨ Hi team! AstroTrader **v1.3** is ready — the dashboard now explains itself. Every chart ends with plain-English *Shows · Means · Do* lines 💡; the Quant Desk gained Signals (24 classic rules backtested on full history), Heatmaps, Risk & Regime and Portfolio tabs 📊; Model Lab runs **~47 models on each stock's entire history** (S&P 500 since 1928) 🧠; Suri cycles and every 45-day sky event are backed by an event study on the selected stock 🌕; the kundli is location- and DST-aware with a symbol legend, a Stock × Kundli correlation tab and the **drikpanchang-correct antardasha** 🕉️; a TradingAgents-style desk 🤖 and a final 30/60/90/365-day strategy with an illustrative £500/week income plan close the page 🎯. 52 backend tests green ✅ — details in `ASTROTRADER.md` §25. Educational research, not financial advice. 🌸🪐
